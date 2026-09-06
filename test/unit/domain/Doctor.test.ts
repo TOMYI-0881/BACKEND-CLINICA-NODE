@@ -6,6 +6,7 @@ const baseProps = {
   userId: 'user-1',
   isActive: true,
   createdAt: new Date(),
+  photoUrl: null,
 };
 
 describe('Doctor', () => {

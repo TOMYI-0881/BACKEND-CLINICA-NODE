@@ -20,7 +20,7 @@ export function buildApiRouter(container: AppContainer): Router {
   // el Buffer crudo del body para verificar la firma HMAC (ver webhooks.routes.ts).
   const jsonBody = express.json();
 
-  router.use('/auth', jsonBody, buildAuthRoutes(container.controllers.auth));
+  router.use('/auth', jsonBody, buildAuthRoutes(container.controllers.auth, container.tokens));
   router.use('/doctors', jsonBody, buildDoctorsRoutes(container.controllers.doctors, container.tokens));
   router.use(
     '/appointments',

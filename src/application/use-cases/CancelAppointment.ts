@@ -4,10 +4,12 @@ import { UserRepository } from '../../domain/ports/UserRepository';
 import { EventPublisher } from '../../domain/ports/EventPublisher';
 import { NotificationService } from '../../domain/ports/NotificationService';
 import { EmailService } from '../../domain/ports/EmailService';
+import { QueueRepository } from '../../domain/ports/QueueRepository';
 import { NotFoundError } from '../../domain/errors/NotFoundError';
 import { ForbiddenError } from '../../domain/errors/ForbiddenError';
 import { computeFreeSlots } from '../../domain/entities/Availability';
 import { CancelAppointmentDto } from '../dtos/CancelAppointmentDto';
+import { broadcastQueueStatus } from './broadcastQueueStatus';
 import { logError } from '../logError';
 import { UserRole } from '../../domain/entities/User';
 
@@ -23,6 +25,7 @@ export class CancelAppointment {
     private readonly events: EventPublisher,
     private readonly notifier: NotificationService,
     private readonly email: EmailService,
+    private readonly queues: QueueRepository,
   ) {}
 
   async execute(dto: CancelAppointmentDto, requester: Requester): Promise<Appointment> {
@@ -43,6 +46,7 @@ export class CancelAppointment {
       .notify(`Reserva cancelada: doctor ${cancelled.doctorId}, ${date}`)
       .catch(logError);
     this.notifyPatient(cancelled.patientId, cancelled.startTime).catch(logError);
+    broadcastQueueStatus(this.events, this.queues, cancelled.doctorId, date).catch(logError);
 
     return cancelled;
   }

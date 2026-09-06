@@ -19,6 +19,7 @@ describe('CreateDoctor', () => {
       specialty: 'Cardiologia',
       isActive: true,
       createdAt: new Date(),
+      photoUrl: null,
     });
     doctors.createDoctorAccount.mockResolvedValue(created);
 

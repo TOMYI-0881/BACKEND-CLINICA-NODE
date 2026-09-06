@@ -17,7 +17,15 @@ function buildAppointment(doctorId: string, patientId: string): Appointment {
 }
 
 function buildDoctor(id: string, userId: string): Doctor {
-  return Doctor.create({ id, userId, name: 'Dr. Test', specialty: 'Test', isActive: true, createdAt: new Date() });
+  return Doctor.create({
+    id,
+    userId,
+    name: 'Dr. Test',
+    specialty: 'Test',
+    isActive: true,
+    createdAt: new Date(),
+    photoUrl: null,
+  });
 }
 
 describe('ListMyAppointments', () => {

@@ -17,6 +17,7 @@ function buildDoctor(): Doctor {
     specialty: 'Cardiologia',
     isActive: true,
     createdAt: new Date(),
+    photoUrl: null,
   });
 }
 
@@ -27,6 +28,8 @@ function buildDoctorUser(): User {
     passwordHash: 'old-hash',
     role: 'DOCTOR',
     createdAt: new Date(),
+    photoUrl: null,
+    name: '',
   });
 }
 

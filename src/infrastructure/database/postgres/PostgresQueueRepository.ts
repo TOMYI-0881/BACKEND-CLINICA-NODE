@@ -34,6 +34,12 @@ interface TurnRow {
 const SELECT_COLUMNS =
   'id, doctor_id, appointment_id, queue_date, number, patient_name, priority, status, created_at, finished_at';
 
+// Version calificada con alias "t.", usada solo en los SELECT de waiting que hacen JOIN
+// contra appointments (getStatus/promoteNextWaiting) -- sin esto "id"/"status"/etc. serian
+// ambiguos entre turns y appointments.
+const QUALIFIED_TURN_COLUMNS =
+  't.id, t.doctor_id, t.appointment_id, t.queue_date, t.number, t.patient_name, t.priority, t.status, t.created_at, t.finished_at';
+
 function toDomain(row: TurnRow): Turn {
   return Turn.create({
     id: row.id,
@@ -119,8 +125,11 @@ export class PostgresQueueRepository implements QueueRepository {
         [doctorId, queueDate],
       ),
       this.pool.query<TurnRow>(
-        `SELECT ${SELECT_COLUMNS} FROM turns WHERE doctor_id = $1 AND queue_date = $2 AND status = 'waiting'
-         ORDER BY (priority = 'preferente') DESC, number ASC`,
+        `SELECT ${QUALIFIED_TURN_COLUMNS} FROM turns t
+         LEFT JOIN appointments a ON a.id = t.appointment_id
+         WHERE t.doctor_id = $1 AND t.queue_date = $2 AND t.status = 'waiting'
+           AND (a.id IS NULL OR a.status = 'CONFIRMED')
+         ORDER BY (t.priority = 'preferente') DESC, COALESCE(a.created_at, t.created_at) ASC, t.number ASC`,
         [doctorId, queueDate],
       ),
     ]);
@@ -208,11 +217,13 @@ export class PostgresQueueRepository implements QueueRepository {
     queueDate: string,
   ): Promise<Turn | null> {
     const nextResult = await client.query<TurnRow>(
-      `SELECT ${SELECT_COLUMNS} FROM turns
-       WHERE doctor_id = $1 AND queue_date = $2 AND status = 'waiting'
-       ORDER BY (priority = 'preferente') DESC, number ASC
+      `SELECT ${QUALIFIED_TURN_COLUMNS} FROM turns t
+       LEFT JOIN appointments a ON a.id = t.appointment_id
+       WHERE t.doctor_id = $1 AND t.queue_date = $2 AND t.status = 'waiting'
+         AND (a.id IS NULL OR a.status = 'CONFIRMED')
+       ORDER BY (t.priority = 'preferente') DESC, COALESCE(a.created_at, t.created_at) ASC, t.number ASC
        LIMIT 1
-       FOR UPDATE SKIP LOCKED`,
+       FOR UPDATE OF t SKIP LOCKED`,
       [doctorId, queueDate],
     );
     const nextRow = nextResult.rows[0];

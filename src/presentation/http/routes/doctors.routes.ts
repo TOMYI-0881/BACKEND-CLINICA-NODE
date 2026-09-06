@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { DoctorsController } from '../controllers/doctors.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { requireRole } from '../middlewares/roles.middleware';
+import { photoUpload } from '../middlewares/upload.middleware';
 import { TokenService } from '../../../domain/ports/TokenService';
 
 /**
@@ -56,6 +57,35 @@ import { TokenService } from '../../../domain/ports/TokenService';
  *     responses:
  *       200: { description: Contrasena restablecida }
  *       404: { description: Doctor no encontrado }
+ * /doctors/{id}/photo:
+ *   post:
+ *     summary: Sube (o reemplaza) la foto de perfil de un doctor. Requiere JWT de rol ADMIN.
+ *     tags: [Doctors]
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [photo]
+ *             properties:
+ *               photo: { type: string, format: binary }
+ *     responses:
+ *       200: { description: Foto actualizada }
+ *       400: { description: Falta el archivo, formato no soportado o excede el tamano maximo }
+ *       401: { description: No autenticado }
+ *       403: { description: Rol distinto de ADMIN }
+ *       404: { description: Doctor no encontrado }
+ *   delete:
+ *     summary: Quita la foto de perfil de un doctor. Requiere JWT de rol ADMIN.
+ *     tags: [Doctors]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Foto eliminada }
+ *       401: { description: No autenticado }
+ *       403: { description: Rol distinto de ADMIN }
+ *       404: { description: Doctor no encontrado }
  */
 export function buildDoctorsRoutes(controller: DoctorsController, tokens: TokenService): Router {
   const router = Router();
@@ -66,6 +96,8 @@ export function buildDoctorsRoutes(controller: DoctorsController, tokens: TokenS
   router.patch('/:id', ...admin, controller.update);
   router.delete('/:id', ...admin, controller.deactivate);
   router.post('/:id/reset-password', ...admin, controller.resetPassword);
+  router.post('/:id/photo', ...admin, photoUpload.single('photo'), controller.uploadPhoto);
+  router.delete('/:id/photo', ...admin, controller.removePhoto);
 
   return router;
 }

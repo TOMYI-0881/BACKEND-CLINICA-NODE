@@ -9,6 +9,7 @@ import {
   makeNotificationService,
   makeUserRepo,
   makeEmailService,
+  makeQueueRepo,
 } from './mocks';
 
 function buildAppointment(patientId: string): Appointment {
@@ -24,7 +25,15 @@ function buildAppointment(patientId: string): Appointment {
 }
 
 function buildPatient(id: string): User {
-  return User.create({ id, email: `${id}@test.com`, passwordHash: 'hash', role: 'PATIENT', createdAt: new Date() });
+  return User.create({
+    id,
+    email: `${id}@test.com`,
+    passwordHash: 'hash',
+    role: 'PATIENT',
+    createdAt: new Date(),
+    photoUrl: null,
+    name: 'Juan Perez',
+  });
 }
 
 describe('CancelAppointment', () => {
@@ -37,6 +46,7 @@ describe('CancelAppointment', () => {
       makeEventPublisher(),
       makeNotificationService(),
       makeEmailService(),
+      makeQueueRepo(),
     );
 
     await expect(
@@ -56,6 +66,7 @@ describe('CancelAppointment', () => {
       makeEventPublisher(),
       makeNotificationService(),
       makeEmailService(),
+      makeQueueRepo(),
     );
 
     const result = await useCase.execute({ appointmentId: 'apt-1' }, { userId: 'pat-owner', role: 'PATIENT' });
@@ -75,6 +86,7 @@ describe('CancelAppointment', () => {
       makeEventPublisher(),
       makeNotificationService(),
       makeEmailService(),
+      makeQueueRepo(),
     );
 
     const result = await useCase.execute({ appointmentId: 'apt-1' }, { userId: 'admin-1', role: 'ADMIN' });
@@ -91,6 +103,7 @@ describe('CancelAppointment', () => {
       makeEventPublisher(),
       makeNotificationService(),
       makeEmailService(),
+      makeQueueRepo(),
     );
 
     await expect(
@@ -106,7 +119,14 @@ describe('CancelAppointment', () => {
     const notifier = makeNotificationService();
     notifier.notify.mockRejectedValue(new Error('Discord caido'));
 
-    const useCase = new CancelAppointment(repo, makeUserRepo(), makeEventPublisher(), notifier, makeEmailService());
+    const useCase = new CancelAppointment(
+      repo,
+      makeUserRepo(),
+      makeEventPublisher(),
+      notifier,
+      makeEmailService(),
+      makeQueueRepo(),
+    );
     const result = await useCase.execute({ appointmentId: 'apt-1' }, { userId: 'pat-owner', role: 'PATIENT' });
 
     expect(result).toBe(cancelled);
@@ -122,7 +142,14 @@ describe('CancelAppointment', () => {
     const email = makeEmailService();
     email.send.mockRejectedValue(new Error('SMTP caido'));
 
-    const useCase = new CancelAppointment(repo, users, makeEventPublisher(), makeNotificationService(), email);
+    const useCase = new CancelAppointment(
+      repo,
+      users,
+      makeEventPublisher(),
+      makeNotificationService(),
+      email,
+      makeQueueRepo(),
+    );
     const result = await useCase.execute({ appointmentId: 'apt-1' }, { userId: 'pat-owner', role: 'PATIENT' });
 
     expect(result).toBe(cancelled);
@@ -138,7 +165,14 @@ describe('CancelAppointment', () => {
     users.findById.mockResolvedValue(patient);
     const email = makeEmailService();
 
-    const useCase = new CancelAppointment(repo, users, makeEventPublisher(), makeNotificationService(), email);
+    const useCase = new CancelAppointment(
+      repo,
+      users,
+      makeEventPublisher(),
+      makeNotificationService(),
+      email,
+      makeQueueRepo(),
+    );
     await useCase.execute({ appointmentId: 'apt-1' }, { userId: 'admin-1', role: 'ADMIN' });
     await Promise.resolve();
     await Promise.resolve();

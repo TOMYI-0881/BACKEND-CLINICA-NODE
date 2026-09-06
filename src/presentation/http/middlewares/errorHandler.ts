@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
+import { MulterError } from 'multer';
 import { CustomError } from '../../../domain/errors/CustomError';
 import { logger } from '../../../config/logger';
 
@@ -13,6 +14,12 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
 
   if (err instanceof ZodError) {
     res.status(400).json({ error: 'Datos invalidos', details: err.issues });
+    return;
+  }
+
+  // Errores de multer no capturados por el fileFilter (ej. LIMIT_FILE_SIZE).
+  if (err instanceof MulterError) {
+    res.status(400).json({ error: err.message });
     return;
   }
 

@@ -10,6 +10,7 @@ export interface AppointmentProps {
   endTime: Date;
   status: AppointmentStatus;
   createdAt: Date;
+  patientEmail?: string;
 }
 
 const VALID_STATUSES: AppointmentStatus[] = ['CONFIRMED', 'CANCELLED', 'CANCELLATION_REQUESTED'];
@@ -53,6 +54,10 @@ export class Appointment {
 
   get createdAt(): Date {
     return this.props.createdAt;
+  }
+
+  get patientEmail(): string | undefined {
+    return this.props.patientEmail;
   }
 
   isConfirmed(): boolean {

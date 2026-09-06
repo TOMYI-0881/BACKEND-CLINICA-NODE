@@ -7,7 +7,14 @@ import {
 } from '../../../domain/ports/AppointmentRepository';
 import { ConflictError } from '../../../domain/errors/ConflictError';
 import { NotFoundError } from '../../../domain/errors/NotFoundError';
-import { PG_EXCLUSION_VIOLATION, isTransientConcurrencyError, pgErrorCode, withRetry } from './pgErrors';
+import {
+  PG_EXCLUSION_VIOLATION,
+  PG_UNIQUE_VIOLATION,
+  isTransientConcurrencyError,
+  pgErrorCode,
+  pgErrorConstraint,
+  withRetry,
+} from './pgErrors';
 
 interface AppointmentRow {
   id: string;
@@ -17,6 +24,7 @@ interface AppointmentRow {
   end_time: Date;
   status: AppointmentStatus;
   created_at: Date;
+  patient_email?: string;
 }
 
 function toDomain(row: AppointmentRow): Appointment {
@@ -28,6 +36,7 @@ function toDomain(row: AppointmentRow): Appointment {
     endTime: row.end_time,
     status: row.status,
     createdAt: row.created_at,
+    patientEmail: row.patient_email,
   });
 }
 
@@ -52,7 +61,16 @@ export class PostgresAppointmentRepository implements AppointmentRepository {
           return toDomain(row);
         } catch (err) {
           if (pgErrorCode(err) === PG_EXCLUSION_VIOLATION) {
+            if (pgErrorConstraint(err) === 'no_overlapping_patient_appointments') {
+              throw new ConflictError('Ya tenes otra cita en ese horario con otro medico');
+            }
             throw new ConflictError('Horario ya reservado');
+          }
+          if (
+            pgErrorCode(err) === PG_UNIQUE_VIOLATION &&
+            pgErrorConstraint(err) === 'idx_one_active_appointment_per_patient_doctor'
+          ) {
+            throw new ConflictError('Ya tenes una cita activa con este medico');
           }
           throw err;
         }
@@ -80,7 +98,12 @@ export class PostgresAppointmentRepository implements AppointmentRepository {
 
   async findByDoctor(doctorId: string): Promise<Appointment[]> {
     const result = await this.pool.query<AppointmentRow>(
-      `SELECT ${SELECT_COLUMNS} FROM appointments WHERE doctor_id = $1 ORDER BY start_time DESC`,
+      `SELECT a.id, a.doctor_id, a.patient_id, a.start_time, a.end_time,
+              a.status, a.created_at, users.email AS patient_email
+       FROM appointments a
+       JOIN users ON users.id = a.patient_id
+       WHERE a.doctor_id = $1
+       ORDER BY a.start_time DESC`,
       [doctorId],
     );
     return result.rows.map(toDomain);

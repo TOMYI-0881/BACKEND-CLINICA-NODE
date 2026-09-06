@@ -7,6 +7,8 @@ const baseProps = {
   passwordHash: 'hashed',
   role: 'PATIENT' as const,
   createdAt: new Date('2026-01-01T00:00:00Z'),
+  photoUrl: null,
+  name: 'Juan Perez',
 };
 
 describe('User', () => {
@@ -28,5 +30,10 @@ describe('User', () => {
     const user = User.create(baseProps);
     const json = user.toJSON();
     expect(json).not.toHaveProperty('passwordHash');
+  });
+
+  it('acepta name vacio (cuentas de doctor/admin no pasan por RegisterUser)', () => {
+    expect(() => User.create({ ...baseProps, name: '' })).not.toThrow();
+    expect(User.create({ ...baseProps, name: '' }).name).toBe('');
   });
 });

@@ -23,7 +23,7 @@ describe('E2E: carga de concurrencia en reservas (seccion 10, Fase 6)', () => {
 
       await request(ctx.app)
         .post('/api/auth/register')
-        .send({ email: 'carga.paciente@test.com', password: 'secret123' });
+        .send({ email: 'carga.paciente@test.com', password: 'secret123', name: 'Carga Paciente' });
       const loginRes = await request(ctx.app)
         .post('/api/auth/login')
         .send({ email: 'carga.paciente@test.com', password: 'secret123' });

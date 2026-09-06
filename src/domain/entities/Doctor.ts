@@ -7,6 +7,7 @@ export interface DoctorProps {
   specialty: string;
   isActive: boolean;
   createdAt: Date;
+  photoUrl: string | null;
 }
 
 export class Doctor {
@@ -44,6 +45,10 @@ export class Doctor {
 
   get createdAt(): Date {
     return this.props.createdAt;
+  }
+
+  get photoUrl(): string | null {
+    return this.props.photoUrl;
   }
 
   toJSON(): DoctorProps {

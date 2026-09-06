@@ -11,6 +11,6 @@ export class RegisterUser {
 
   async execute(dto: RegisterUserDto): Promise<User> {
     const passwordHash = await this.hasher.hash(dto.password);
-    return this.users.save({ email: dto.email, passwordHash, role: 'PATIENT' });
+    return this.users.save({ email: dto.email, passwordHash, role: 'PATIENT', name: dto.name });
   }
 }

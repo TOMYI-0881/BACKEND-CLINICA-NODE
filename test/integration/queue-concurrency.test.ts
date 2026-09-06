@@ -179,7 +179,7 @@ describe('Concurrencia de la cola de espera contra Postgres real', () => {
 
   it('idx_turns_one_per_appointment: exactamente un check-in tiene exito ante doble check-in concurrente de la misma cita', async () => {
     const doctor = await createTestDoctor(doctorRepo,{ name: 'Dr. Doble Check-in', specialty: 'Test' });
-    const patient = await userRepo.save({ email: 'doble-checkin@test.com', passwordHash: 'hash', role: 'PATIENT' });
+    const patient = await userRepo.save({ email: 'doble-checkin@test.com', passwordHash: 'hash', role: 'PATIENT', name: 'Test' });
     const appointment = await appointmentRepo.save({
       doctorId: doctor.id,
       patientId: patient.id,

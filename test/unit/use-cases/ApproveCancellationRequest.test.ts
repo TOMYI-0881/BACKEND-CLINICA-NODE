@@ -12,6 +12,7 @@ import {
   makeEventPublisher,
   makeNotificationService,
   makeEmailService,
+  makeQueueRepo,
 } from './mocks';
 
 function buildResolvedRequest(): CancellationRequest {
@@ -47,11 +48,27 @@ describe('ApproveCancellationRequest', () => {
     appointments.findById.mockResolvedValue(buildAppointment());
     const doctors = makeDoctorRepo();
     doctors.findById.mockResolvedValue(
-      Doctor.create({ id: 'doc-1', userId: 'u1', name: 'Dr. Test', specialty: 'Test', isActive: true, createdAt: new Date() }),
+      Doctor.create({
+        id: 'doc-1',
+        userId: 'u1',
+        name: 'Dr. Test',
+        specialty: 'Test',
+        isActive: true,
+        createdAt: new Date(),
+        photoUrl: null,
+      }),
     );
     const users = makeUserRepo();
     users.findById.mockResolvedValue(
-      User.create({ id: 'pat-1', email: 'pat-1@test.com', passwordHash: 'h', role: 'PATIENT', createdAt: new Date() }),
+      User.create({
+        id: 'pat-1',
+        email: 'pat-1@test.com',
+        passwordHash: 'h',
+        role: 'PATIENT',
+        createdAt: new Date(),
+        photoUrl: null,
+        name: 'Juan Perez',
+      }),
     );
     const notifier = makeNotificationService();
     const email = makeEmailService();
@@ -64,6 +81,7 @@ describe('ApproveCancellationRequest', () => {
       makeEventPublisher(),
       notifier,
       email,
+      makeQueueRepo(),
     );
     const result = await useCase.execute('req-1', 'admin-1');
     await Promise.resolve();
@@ -87,6 +105,7 @@ describe('ApproveCancellationRequest', () => {
       makeEventPublisher(),
       makeNotificationService(),
       makeEmailService(),
+      makeQueueRepo(),
     );
 
     await expect(useCase.execute('req-1', 'admin-1')).rejects.toThrow(ValidationError);

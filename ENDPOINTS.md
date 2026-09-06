@@ -17,6 +17,9 @@ usá la documentación OpenAPI/Swagger servida en **`GET /api-docs`** con la API
 |---|---|---|---|
 | POST | [`/api/auth/register`](#post-apiauthregister) | No | - |
 | POST | [`/api/auth/login`](#post-apiauthlogin) | No | - |
+| GET | [`/api/auth/me`](#get-apiauthme) | JWT | Cualquier rol |
+| POST | [`/api/auth/me/photo`](#post-apiauthmephoto) | JWT | Cualquier rol |
+| DELETE | [`/api/auth/me/photo`](#delete-apiauthmephoto) | JWT | Cualquier rol |
 | GET | [`/api/doctors`](#get-apidoctors) | No | - |
 | POST | [`/api/doctors`](#post-apidoctors) | JWT | ADMIN |
 | PATCH | [`/api/doctors/:id`](#patch-apidoctorsid) | JWT | ADMIN |
@@ -53,10 +56,12 @@ Registra un usuario nuevo. Siempre se crea con rol `PATIENT`.
 
 **Body**
 ```json
-{ "email": "paciente@test.com", "password": "secret123" }
+{ "email": "paciente@test.com", "password": "secret123", "name": "Juan Perez" }
 ```
 - `email`: string, formato email
 - `password`: string, mínimo 6 caracteres
+- `name`: string, entre 2 y 120 caracteres (se usa como nombre visible, ej. en la lista de
+  espera de la cola en vivo)
 
 **Respuestas**
 | Status | Cuándo |
@@ -67,7 +72,7 @@ Registra un usuario nuevo. Siempre se crea con rol `PATIENT`.
 
 ```json
 // 201
-{ "id": "uuid", "email": "paciente@test.com", "role": "PATIENT", "createdAt": "2026-..." }
+{ "id": "uuid", "email": "paciente@test.com", "role": "PATIENT", "createdAt": "2026-...", "photoUrl": null, "name": "Juan Perez" }
 ```
 
 ### `POST /api/auth/login`
@@ -92,9 +97,51 @@ Autentica y devuelve un JWT.
 // 200
 {
   "token": "eyJhbGciOi...",
-  "user": { "id": "uuid", "email": "paciente@test.com", "role": "PATIENT", "createdAt": "2026-..." }
+  "user": { "id": "uuid", "email": "paciente@test.com", "role": "PATIENT", "createdAt": "2026-...", "photoUrl": null, "name": "Juan Perez" }
 }
 ```
+
+### `GET /api/auth/me`
+
+Devuelve el perfil del usuario autenticado (mismo shape que el `user` de `POST /auth/login`).
+Sirve para los 3 roles.
+
+**Respuestas**: `200` perfil propio · `401` sin JWT
+
+```json
+// 200
+{ "id": "uuid", "email": "paciente@test.com", "role": "PATIENT", "createdAt": "2026-...", "photoUrl": "/uploads/photos/<archivo>.jpg", "name": "Juan Perez" }
+```
+
+### `POST /api/auth/me/photo`
+
+Sube (o reemplaza) la foto de perfil del usuario autenticado. **Una sola foto por usuario y
+opcional**: subir una nueva borra la anterior del disco, nunca se acumulan varias. Si el
+usuario es rol `DOCTOR`, la foto se replica automáticamente en su perfil público (aparece
+también en `GET /api/doctors`). Sirve para los 3 roles.
+
+**Body**: `multipart/form-data`, campo `photo` (archivo)
+- Formatos aceptados: `jpg`, `png`, `webp`
+- Tamaño máximo: `MAX_PHOTO_SIZE_MB` (default 2 MB)
+
+**Respuestas**
+| Status | Cuándo |
+|---|---|
+| 200 | Foto actualizada. Devuelve el usuario con el `photoUrl` nuevo |
+| 400 | Falta el archivo, formato no soportado, o excede el tamaño máximo |
+| 401 | Sin JWT |
+
+```json
+// 200
+{ "id": "uuid", "email": "paciente@test.com", "role": "PATIENT", "createdAt": "2026-...", "photoUrl": "/uploads/photos/<archivo>.jpg", "name": "Juan Perez" }
+```
+
+### `DELETE /api/auth/me/photo`
+
+Quita la foto de perfil del usuario autenticado (y su réplica en `doctors` si es `DOCTOR`).
+Borra también el archivo del disco. Sirve para los 3 roles.
+
+**Respuestas**: `200` `{ "ok": true }` · `401` sin JWT
 
 ---
 
@@ -104,9 +151,13 @@ Autentica y devuelve un JWT.
 
 Lista los doctores **activos**. Público.
 
+`photoUrl` se puebla automáticamente cuando ese doctor sube su foto vía
+`POST /api/auth/me/photo` estando logueado con su propia cuenta — no hay una ruta separada
+para setearla desde acá.
+
 ```json
 // 200
-[{ "id": "uuid", "userId": "uuid", "name": "Dra. Ana Fernandez", "specialty": "Cardiologia", "isActive": true, "createdAt": "2026-..." }]
+[{ "id": "uuid", "userId": "uuid", "name": "Dra. Ana Fernandez", "specialty": "Cardiologia", "isActive": true, "createdAt": "2026-...", "photoUrl": null }]
 ```
 
 ### `POST /api/doctors`
@@ -197,7 +248,15 @@ Crea una reserva para el paciente autenticado. Requiere JWT de rol **PATIENT**.
 Lista las reservas propias. Requiere JWT de rol **PATIENT** o **DOCTOR**:
 - Si sos `PATIENT`, devuelve las citas donde sos el paciente.
 - Si sos `DOCTOR`, devuelve las citas donde sos el doctor (útil para obtener el `id` de una
-  cita propia antes de llamar `POST /appointments/:id/request-cancellation`).
+  cita propia antes de llamar `POST /appointments/:id/request-cancellation`). Cada item incluye
+  además `patientEmail` (el email del paciente de esa cita), para poder identificarlo en la UI
+  sin necesitar un endpoint de usuarios. **Solo para rol DOCTOR** — PATIENT y el listado de
+  ADMIN (`GET /api/appointments`) no traen este campo.
+
+```json
+// 200 (rol DOCTOR)
+[{ "id": "uuid", "doctorId": "uuid", "patientId": "uuid", "startTime": "2026-...", "endTime": "2026-...", "status": "CONFIRMED", "createdAt": "2026-...", "patientEmail": "paciente@test.com" }]
+```
 
 ### `GET /api/appointments`
 

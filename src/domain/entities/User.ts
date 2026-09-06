@@ -8,6 +8,8 @@ export interface UserProps {
   passwordHash: string;
   role: UserRole;
   createdAt: Date;
+  photoUrl: string | null;
+  name: string;
 }
 
 export class User {
@@ -46,6 +48,17 @@ export class User {
     return this.props.createdAt;
   }
 
+  get photoUrl(): string | null {
+    return this.props.photoUrl;
+  }
+
+  // name puede venir '' (columna NOT NULL DEFAULT ''): las cuentas de doctor/admin no pasan
+  // por RegisterUser (unico lugar que exige nombre, via RegisterUserSchema), asi que create()
+  // no valida "obligatorio" aca -- romperia login/lectura de esas cuentas existentes.
+  get name(): string {
+    return this.props.name;
+  }
+
   isAdmin(): boolean {
     return this.props.role === 'ADMIN';
   }
@@ -56,6 +69,8 @@ export class User {
       email: this.props.email,
       role: this.props.role,
       createdAt: this.props.createdAt,
+      photoUrl: this.props.photoUrl,
+      name: this.props.name,
     };
   }
 }

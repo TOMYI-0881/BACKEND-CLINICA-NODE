@@ -1,7 +1,27 @@
 import { CreateAppointment } from '../../../src/application/use-cases/CreateAppointment';
 import { Appointment } from '../../../src/domain/entities/Appointment';
+import { User } from '../../../src/domain/entities/User';
 import { ConflictError } from '../../../src/domain/errors/ConflictError';
-import { makeAppointmentRepo, makeEventPublisher, makeLockService, makeNotificationService } from './mocks';
+import {
+  makeAppointmentRepo,
+  makeEventPublisher,
+  makeLockService,
+  makeNotificationService,
+  makeUserRepo,
+  makeQueueRepo,
+} from './mocks';
+
+function buildPatient(id: string, email: string, name = ''): User {
+  return User.create({
+    id,
+    email,
+    passwordHash: 'hash',
+    role: 'PATIENT',
+    createdAt: new Date(),
+    photoUrl: null,
+    name,
+  });
+}
 
 function buildAppointment(overrides: Partial<Parameters<typeof Appointment.create>[0]> = {}): Appointment {
   return Appointment.create({
@@ -31,7 +51,7 @@ describe('CreateAppointment', () => {
     const events = makeEventPublisher();
     const notifier = makeNotificationService();
 
-    const useCase = new CreateAppointment(repo, lock, events, notifier);
+    const useCase = new CreateAppointment(repo, lock, events, notifier, makeUserRepo(), makeQueueRepo());
     const result = await useCase.execute(baseDto, 'pat-1');
 
     expect(result).toBe(appointment);
@@ -59,7 +79,7 @@ describe('CreateAppointment', () => {
     const events = makeEventPublisher();
     const notifier = makeNotificationService();
 
-    const useCase = new CreateAppointment(repo, lock, events, notifier);
+    const useCase = new CreateAppointment(repo, lock, events, notifier, makeUserRepo(), makeQueueRepo());
 
     await expect(useCase.execute(baseDto, 'pat-1')).rejects.toThrow(ConflictError);
     await Promise.resolve();
@@ -76,7 +96,7 @@ describe('CreateAppointment', () => {
     const events = makeEventPublisher();
     const notifier = makeNotificationService();
 
-    const useCase = new CreateAppointment(repo, lock, events, notifier);
+    const useCase = new CreateAppointment(repo, lock, events, notifier, makeUserRepo(), makeQueueRepo());
     const result = await useCase.execute(baseDto, 'pat-1');
 
     expect(result).toBe(appointment);
@@ -94,7 +114,7 @@ describe('CreateAppointment', () => {
     const notifier = makeNotificationService();
     notifier.notify.mockRejectedValue(new Error('Discord caido'));
 
-    const useCase = new CreateAppointment(repo, lock, events, notifier);
+    const useCase = new CreateAppointment(repo, lock, events, notifier, makeUserRepo(), makeQueueRepo());
     const result = await useCase.execute(baseDto, 'pat-1');
 
     expect(result).toBe(appointment);
@@ -113,7 +133,14 @@ describe('CreateAppointment', () => {
       endTime: new Date(boundaryDto.endTime),
     });
     repo.save.mockResolvedValue(appointment);
-    const useCase = new CreateAppointment(repo, makeLockService(), makeEventPublisher(), makeNotificationService());
+    const useCase = new CreateAppointment(
+      repo,
+      makeLockService(),
+      makeEventPublisher(),
+      makeNotificationService(),
+      makeUserRepo(),
+      makeQueueRepo(),
+    );
 
     await useCase.execute(boundaryDto, 'pat-1');
 
@@ -122,6 +149,105 @@ describe('CreateAppointment', () => {
       patientId: 'pat-1',
       startTime: new Date('2026-03-01T11:00:00.000Z'),
       endTime: new Date('2026-03-01T12:00:00.000Z'),
+    });
+  });
+
+  describe('auto-enrolado en cola (reservar = entrar en cola automaticamente)', () => {
+    it('encola la cita recien creada con el nombre real de la cuenta, la fecha de la cita y el appointmentId', async () => {
+      const repo = makeAppointmentRepo();
+      const appointment = buildAppointment();
+      repo.save.mockResolvedValue(appointment);
+      const users = makeUserRepo();
+      users.findById.mockResolvedValue(buildPatient('pat-1', 'juan.perez@test.com', 'Juan Perez'));
+      const queues = makeQueueRepo();
+      queues.getStatus.mockResolvedValue({ current: null, waiting: [] });
+      const events = makeEventPublisher();
+
+      const useCase = new CreateAppointment(repo, makeLockService(), events, makeNotificationService(), users, queues);
+      await useCase.execute(baseDto, 'pat-1');
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(queues.checkIn).toHaveBeenCalledWith({
+        doctorId: 'doc-1',
+        queueDate: '2026-03-01',
+        appointmentId: 'apt-1',
+        patientName: 'Juan Perez',
+        priority: 'normal',
+      });
+      expect(events.publish).toHaveBeenCalledWith(
+        'doctor:doc-1',
+        expect.objectContaining({ type: 'queue-updated' }),
+      );
+    });
+
+    it('si la cuenta tiene name vacio (cuenta vieja/doctor/admin), cae al prefijo del email', async () => {
+      const repo = makeAppointmentRepo();
+      repo.save.mockResolvedValue(buildAppointment());
+      const users = makeUserRepo();
+      users.findById.mockResolvedValue(buildPatient('pat-1', 'juan.perez@test.com'));
+      const queues = makeQueueRepo();
+      queues.getStatus.mockResolvedValue({ current: null, waiting: [] });
+
+      const useCase = new CreateAppointment(
+        repo,
+        makeLockService(),
+        makeEventPublisher(),
+        makeNotificationService(),
+        users,
+        queues,
+      );
+      await useCase.execute(baseDto, 'pat-1');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(queues.checkIn).toHaveBeenCalledWith(expect.objectContaining({ patientName: 'juan.perez' }));
+    });
+
+    it('si no encuentra al paciente, usa "Paciente" como patientName', async () => {
+      const repo = makeAppointmentRepo();
+      repo.save.mockResolvedValue(buildAppointment());
+      const users = makeUserRepo();
+      users.findById.mockResolvedValue(null);
+      const queues = makeQueueRepo();
+      queues.getStatus.mockResolvedValue({ current: null, waiting: [] });
+
+      const useCase = new CreateAppointment(
+        repo,
+        makeLockService(),
+        makeEventPublisher(),
+        makeNotificationService(),
+        users,
+        queues,
+      );
+      await useCase.execute(baseDto, 'pat-1');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(queues.checkIn).toHaveBeenCalledWith(expect.objectContaining({ patientName: 'Paciente' }));
+    });
+
+    it('fail-open: si el enrolado en cola falla, la reserva ya creada se devuelve igual', async () => {
+      const repo = makeAppointmentRepo();
+      const appointment = buildAppointment();
+      repo.save.mockResolvedValue(appointment);
+      const users = makeUserRepo();
+      users.findById.mockResolvedValue(buildPatient('pat-1', 'juan.perez@test.com'));
+      const queues = makeQueueRepo();
+      queues.checkIn.mockRejectedValue(new Error('DB caida'));
+
+      const useCase = new CreateAppointment(
+        repo,
+        makeLockService(),
+        makeEventPublisher(),
+        makeNotificationService(),
+        users,
+        queues,
+      );
+      const result = await useCase.execute(baseDto, 'pat-1');
+
+      expect(result).toBe(appointment);
     });
   });
 });

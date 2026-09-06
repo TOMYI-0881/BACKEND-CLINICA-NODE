@@ -21,8 +21,8 @@ export function buildFakeContainer(overrides: Partial<AppContainer> = {}): AppCo
       cancellationRequests: {} as AppContainer['repositories']['cancellationRequests'],
     },
     controllers: {
-      auth: { register: ok, login: ok },
-      doctors: { create: ok, list: ok, update: ok, deactivate: ok, resetPassword: ok },
+      auth: { register: ok, login: ok, me: ok, updateProfile: ok, uploadPhoto: ok, removePhoto: ok },
+      doctors: { create: ok, list: ok, update: ok, deactivate: ok, resetPassword: ok, uploadPhoto: ok, removePhoto: ok },
       appointments: { availability: ok, create: ok, mine: ok, list: ok, cancel: ok, requestCancellation: ok },
       queues: { checkIn: ok, status: ok, next: ok, skip: ok, call: ok },
       cancellationRequests: { list: ok, approve: ok, reject: ok },

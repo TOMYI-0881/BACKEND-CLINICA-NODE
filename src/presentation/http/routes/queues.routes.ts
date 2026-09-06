@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { QueuesController } from '../controllers/queues.controller';
-import { authMiddleware } from '../middlewares/auth.middleware';
+import { authMiddleware, optionalAuthMiddleware } from '../middlewares/auth.middleware';
 import { requireAdminOrOwnDoctor } from '../middlewares/roles.middleware';
 import { TokenService } from '../../../domain/ports/TokenService';
 import { DoctorRepository } from '../../../domain/ports/DoctorRepository';
@@ -21,7 +21,9 @@ import { DoctorRepository } from '../../../domain/ports/DoctorRepository';
  *       201: { description: Turno creado }
  * /queues/{doctorId}:
  *   get:
- *     summary: Estado actual de la cola (turno en curso + lista de espera)
+ *     summary: Estado actual de la cola (turno en curso + lista de espera). Publica; si se
+ *       manda un JWT de rol PATIENT valido, la respuesta incluye ademas "myTurn"
+ *       (el turno propio para ese doctor en esa fecha, o null).
  *     tags: [Queues]
  *     parameters:
  *       - in: path
@@ -67,7 +69,7 @@ export function buildQueuesRoutes(
   const checkInAccess = requireAdminOrOwnDoctor(doctors, ['PATIENT']);
 
   router.post('/:doctorId/check-in', auth, checkInAccess, controller.checkIn);
-  router.get('/:doctorId', controller.status);
+  router.get('/:doctorId', optionalAuthMiddleware(tokens), controller.status);
   router.post('/:doctorId/next', auth, ownQueue, controller.next);
   router.post('/:doctorId/skip', auth, ownQueue, controller.skip);
   router.post('/:doctorId/call', auth, ownQueue, controller.call);

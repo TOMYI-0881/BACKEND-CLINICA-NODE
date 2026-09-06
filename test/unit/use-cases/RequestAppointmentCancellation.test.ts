@@ -4,10 +4,18 @@ import { Appointment } from '../../../src/domain/entities/Appointment';
 import { CancellationRequest } from '../../../src/domain/entities/CancellationRequest';
 import { ForbiddenError } from '../../../src/domain/errors/ForbiddenError';
 import { NotFoundError } from '../../../src/domain/errors/NotFoundError';
-import { makeAppointmentRepo, makeDoctorRepo, makeCancellationRequestRepo } from './mocks';
+import { makeAppointmentRepo, makeDoctorRepo, makeCancellationRequestRepo, makeEventPublisher, makeQueueRepo } from './mocks';
 
 function buildDoctor(id: string, userId: string): Doctor {
-  return Doctor.create({ id, userId, name: 'Dr. Test', specialty: 'Test', isActive: true, createdAt: new Date() });
+  return Doctor.create({
+    id,
+    userId,
+    name: 'Dr. Test',
+    specialty: 'Test',
+    isActive: true,
+    createdAt: new Date(),
+    photoUrl: null,
+  });
 }
 
 function buildAppointment(doctorId: string): Appointment {
@@ -45,7 +53,13 @@ describe('RequestAppointmentCancellation', () => {
     const created = buildRequest();
     cancellationRequests.create.mockResolvedValue(created);
 
-    const useCase = new RequestAppointmentCancellation(appointments, doctors, cancellationRequests);
+    const useCase = new RequestAppointmentCancellation(
+      appointments,
+      doctors,
+      cancellationRequests,
+      makeEventPublisher(),
+      makeQueueRepo(),
+    );
     const result = await useCase.execute('user-doc-1', 'apt-1', { reason: 'Emergencia' });
 
     expect(cancellationRequests.create).toHaveBeenCalledWith({
@@ -63,7 +77,13 @@ describe('RequestAppointmentCancellation', () => {
     appointments.findById.mockResolvedValue(buildAppointment('doc-OTRO'));
     const cancellationRequests = makeCancellationRequestRepo();
 
-    const useCase = new RequestAppointmentCancellation(appointments, doctors, cancellationRequests);
+    const useCase = new RequestAppointmentCancellation(
+      appointments,
+      doctors,
+      cancellationRequests,
+      makeEventPublisher(),
+      makeQueueRepo(),
+    );
     await expect(useCase.execute('user-doc-1', 'apt-1', { reason: 'Emergencia' })).rejects.toThrow(ForbiddenError);
     expect(cancellationRequests.create).not.toHaveBeenCalled();
   });
@@ -74,7 +94,13 @@ describe('RequestAppointmentCancellation', () => {
     const appointments = makeAppointmentRepo();
     appointments.findById.mockResolvedValue(null);
 
-    const useCase = new RequestAppointmentCancellation(appointments, doctors, makeCancellationRequestRepo());
+    const useCase = new RequestAppointmentCancellation(
+      appointments,
+      doctors,
+      makeCancellationRequestRepo(),
+      makeEventPublisher(),
+      makeQueueRepo(),
+    );
     await expect(useCase.execute('user-doc-1', 'no-existe', { reason: 'Emergencia' })).rejects.toThrow(
       NotFoundError,
     );
@@ -88,6 +114,8 @@ describe('RequestAppointmentCancellation', () => {
       makeAppointmentRepo(),
       doctors,
       makeCancellationRequestRepo(),
+      makeEventPublisher(),
+      makeQueueRepo(),
     );
     await expect(useCase.execute('user-sin-perfil', 'apt-1', { reason: 'Emergencia' })).rejects.toThrow(
       NotFoundError,

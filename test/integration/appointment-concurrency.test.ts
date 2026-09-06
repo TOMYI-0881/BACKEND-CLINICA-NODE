@@ -45,7 +45,7 @@ describe('Concurrencia de reservas contra Postgres real (EXCLUDE constraint)', (
         userRepo.save({
           email: `patient${i}@concurrency.test`,
           passwordHash: 'hash',
-          role: 'PATIENT',
+          role: 'PATIENT', name: 'Test',
         }),
       ),
     );
@@ -80,7 +80,7 @@ describe('Concurrencia de reservas contra Postgres real (EXCLUDE constraint)', (
         userRepo.save({
           email: `overlap${i}@concurrency.test`,
           passwordHash: 'hash',
-          role: 'PATIENT',
+          role: 'PATIENT', name: 'Test',
         }),
       ),
     );
@@ -109,12 +109,12 @@ describe('Concurrencia de reservas contra Postgres real (EXCLUDE constraint)', (
     const patientA = await userRepo.save({
       email: 'a@consecutivo.test',
       passwordHash: 'hash',
-      role: 'PATIENT',
+      role: 'PATIENT', name: 'Test',
     });
     const patientB = await userRepo.save({
       email: 'b@consecutivo.test',
       passwordHash: 'hash',
-      role: 'PATIENT',
+      role: 'PATIENT', name: 'Test',
     });
 
     await appointmentRepo.save({

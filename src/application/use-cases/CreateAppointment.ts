@@ -3,9 +3,12 @@ import { AppointmentRepository } from '../../domain/ports/AppointmentRepository'
 import { LockService } from '../../domain/ports/LockService';
 import { EventPublisher } from '../../domain/ports/EventPublisher';
 import { NotificationService } from '../../domain/ports/NotificationService';
+import { UserRepository } from '../../domain/ports/UserRepository';
+import { QueueRepository } from '../../domain/ports/QueueRepository';
 import { ConflictError } from '../../domain/errors/ConflictError';
 import { computeFreeSlots } from '../../domain/entities/Availability';
 import { CreateAppointmentDto } from '../dtos/CreateAppointmentDto';
+import { broadcastQueueStatus } from './broadcastQueueStatus';
 import { logError } from '../logError';
 
 const LOCK_TTL_MS = 10_000;
@@ -27,6 +30,8 @@ export class CreateAppointment {
     private readonly lock: LockService,
     private readonly events: EventPublisher,
     private readonly notifier: NotificationService,
+    private readonly users: UserRepository,
+    private readonly queues: QueueRepository,
   ) {}
 
   async execute(dto: CreateAppointmentDto, patientId: string): Promise<Appointment> {
@@ -49,6 +54,7 @@ export class CreateAppointment {
       this.notifier
         .notify(`Nueva reserva: doctor ${dto.doctorId}, ${date} ${dto.startTime}`)
         .catch(logError);
+      this.enrollInQueue(appointment, dto.doctorId, date).catch(logError);
 
       return appointment;
     } catch (err) {
@@ -70,5 +76,28 @@ export class CreateAppointment {
       type: 'room-updated',
       payload: { doctorId, availability },
     });
+  }
+
+  /**
+   * Reservar = entrar en cola automaticamente (el check-in manual queda solo para
+   * walk-ins). Fail-open: la cita ya esta persistida, un fallo aca nunca debe tirar
+   * abajo una reserva valida -- por eso el caller la llama con .catch(logError), sin
+   * esperar a que termine.
+   */
+  private async enrollInQueue(appointment: Appointment, doctorId: string, date: string): Promise<void> {
+    const patient = await this.users.findById(appointment.patientId);
+    // patient.name es '' para cuentas viejas/doctor/admin (no pasan por RegisterUser) -- cae
+    // al prefijo del email, mismo fallback que ya existia antes de guardar el nombre real.
+    const patientName = patient?.name || patient?.email.split('@')[0] || 'Paciente';
+
+    await this.queues.checkIn({
+      doctorId,
+      queueDate: date,
+      appointmentId: appointment.id,
+      patientName,
+      priority: 'normal',
+    });
+
+    await broadcastQueueStatus(this.events, this.queues, doctorId, date);
   }
 }

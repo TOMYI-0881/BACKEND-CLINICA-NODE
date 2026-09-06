@@ -27,6 +27,11 @@ const envSchema = z.object({
     (val) => (val === '' || val === undefined ? undefined : val),
     z.coerce.number().int().positive().optional(),
   ),
+  // Foto de perfil de medicos/pacientes (opcional, una sola por usuario). Directorio relativo
+  // a la raiz del proyecto donde se guardan los archivos subidos; se sirve via /uploads
+  // (express.static, ver app.ts).
+  UPLOAD_DIR: z.string().optional().default('uploads'),
+  MAX_PHOTO_SIZE_MB: z.coerce.number().int().positive().optional().default(2),
 });
 
 export type Env = Readonly<{
@@ -45,6 +50,8 @@ export type Env = Readonly<{
   emailFromName: string;
   emailHost: string;
   emailPort: number | undefined;
+  uploadDir: string;
+  maxPhotoSizeMb: number;
 }>;
 
 function loadEnv(): Env {
@@ -75,6 +82,8 @@ function loadEnv(): Env {
     emailFromName: data.EMAIL_FROM_NAME,
     emailHost: data.EMAIL_HOST,
     emailPort: data.EMAIL_PORT,
+    uploadDir: data.UPLOAD_DIR,
+    maxPhotoSizeMb: data.MAX_PHOTO_SIZE_MB,
   };
 }
 

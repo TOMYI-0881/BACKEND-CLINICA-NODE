@@ -52,6 +52,8 @@ export function makeUserRepo(): jest.Mocked<UserRepository> {
     findByEmail: jest.fn(),
     findById: jest.fn(),
     updatePasswordHash: jest.fn().mockResolvedValue(undefined),
+    updatePhotoUrl: jest.fn().mockResolvedValue(undefined),
+    updateProfile: jest.fn(),
   };
 }
 
@@ -63,6 +65,7 @@ export function makeDoctorRepo(): jest.Mocked<DoctorRepository> {
     findByUserId: jest.fn(),
     update: jest.fn(),
     deactivate: jest.fn(),
+    updatePhoto: jest.fn(),
   };
 }
 

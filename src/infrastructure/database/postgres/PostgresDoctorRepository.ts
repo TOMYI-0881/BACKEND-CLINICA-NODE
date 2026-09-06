@@ -12,9 +12,10 @@ interface DoctorRow {
   specialty: string;
   is_active: boolean;
   created_at: Date;
+  photo_url: string | null;
 }
 
-const SELECT_COLUMNS = 'id, user_id, name, specialty, is_active, created_at';
+const SELECT_COLUMNS = 'id, user_id, name, specialty, is_active, created_at, photo_url';
 
 function toDomain(row: DoctorRow): Doctor {
   return Doctor.create({
@@ -24,6 +25,7 @@ function toDomain(row: DoctorRow): Doctor {
     specialty: row.specialty,
     isActive: row.is_active,
     createdAt: row.created_at,
+    photoUrl: row.photo_url,
   });
 }
 
@@ -104,6 +106,16 @@ export class PostgresDoctorRepository implements DoctorRepository {
     const result = await this.pool.query<DoctorRow>(
       `UPDATE doctors SET is_active = false WHERE id = $1 RETURNING ${SELECT_COLUMNS}`,
       [id],
+    );
+    const row = result.rows[0];
+    if (!row) throw new NotFoundError('Doctor no encontrado');
+    return toDomain(row);
+  }
+
+  async updatePhoto(id: string, photoUrl: string | null): Promise<Doctor> {
+    const result = await this.pool.query<DoctorRow>(
+      `UPDATE doctors SET photo_url = $2 WHERE id = $1 RETURNING ${SELECT_COLUMNS}`,
+      [id, photoUrl],
     );
     const row = result.rows[0];
     if (!row) throw new NotFoundError('Doctor no encontrado');

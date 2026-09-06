@@ -4,8 +4,12 @@ import { ListDoctors } from '../../../application/use-cases/ListDoctors';
 import { UpdateDoctor } from '../../../application/use-cases/UpdateDoctor';
 import { DeactivateDoctor } from '../../../application/use-cases/DeactivateDoctor';
 import { ResetDoctorPassword } from '../../../application/use-cases/ResetDoctorPassword';
+import { UpdateDoctorPhoto } from '../../../application/use-cases/UpdateDoctorPhoto';
+import { RemoveDoctorPhoto } from '../../../application/use-cases/RemoveDoctorPhoto';
 import { CreateDoctorSchema } from '../../../application/dtos/CreateDoctorDto';
 import { UpdateDoctorSchema } from '../../../application/dtos/UpdateDoctorDto';
+import { ValidationError } from '../../../domain/errors/ValidationError';
+import { deletePhotoFile } from '../middlewares/upload.middleware';
 import { asyncHandler } from '../asyncHandler';
 
 export interface DoctorsControllerDeps {
@@ -14,6 +18,8 @@ export interface DoctorsControllerDeps {
   updateDoctor: UpdateDoctor;
   deactivateDoctor: DeactivateDoctor;
   resetDoctorPassword: ResetDoctorPassword;
+  updateDoctorPhoto: UpdateDoctorPhoto;
+  removeDoctorPhoto: RemoveDoctorPhoto;
 }
 
 export interface DoctorsController {
@@ -22,6 +28,8 @@ export interface DoctorsController {
   update: RequestHandler;
   deactivate: RequestHandler;
   resetPassword: RequestHandler;
+  uploadPhoto: RequestHandler;
+  removePhoto: RequestHandler;
 }
 
 export function createDoctorsController(deps: DoctorsControllerDeps): DoctorsController {
@@ -52,5 +60,19 @@ export function createDoctorsController(deps: DoctorsControllerDeps): DoctorsCon
     res.status(200).json({ ok: true });
   });
 
-  return { create, list, update, deactivate, resetPassword };
+  const uploadPhoto = asyncHandler(async (req, res) => {
+    if (!req.file) throw new ValidationError('La foto es obligatoria');
+    const photoUrl = `/uploads/photos/${req.file.filename}`;
+    const { doctor, previousPhotoUrl } = await deps.updateDoctorPhoto.execute(req.params['id'] as string, photoUrl);
+    if (previousPhotoUrl && previousPhotoUrl !== photoUrl) deletePhotoFile(previousPhotoUrl);
+    res.status(200).json(doctor.toJSON());
+  });
+
+  const removePhoto = asyncHandler(async (req, res) => {
+    const { previousPhotoUrl } = await deps.removeDoctorPhoto.execute(req.params['id'] as string);
+    deletePhotoFile(previousPhotoUrl);
+    res.status(200).json({ ok: true });
+  });
+
+  return { create, list, update, deactivate, resetPassword, uploadPhoto, removePhoto };
 }

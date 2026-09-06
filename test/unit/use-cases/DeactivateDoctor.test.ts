@@ -9,6 +9,7 @@ import {
   makeEventPublisher,
   makeNotificationService,
   makeEmailService,
+  makeQueueRepo,
 } from './mocks';
 
 function buildDoctor(overrides: Partial<{ isActive: boolean }> = {}): Doctor {
@@ -19,6 +20,7 @@ function buildDoctor(overrides: Partial<{ isActive: boolean }> = {}): Doctor {
     specialty: 'Cardiologia',
     isActive: overrides.isActive ?? false,
     createdAt: new Date(),
+    photoUrl: null,
   });
 }
 
@@ -35,7 +37,15 @@ function buildAppointment(id: string, patientId: string, startTime: string): App
 }
 
 function buildPatient(id: string): User {
-  return User.create({ id, email: `${id}@test.com`, passwordHash: 'hash', role: 'PATIENT', createdAt: new Date() });
+  return User.create({
+    id,
+    email: `${id}@test.com`,
+    passwordHash: 'hash',
+    role: 'PATIENT',
+    createdAt: new Date(),
+    photoUrl: null,
+    name: 'Juan Perez',
+  });
 }
 
 describe('DeactivateDoctor', () => {
@@ -52,6 +62,7 @@ describe('DeactivateDoctor', () => {
       makeEventPublisher(),
       makeNotificationService(),
       makeEmailService(),
+      makeQueueRepo(),
     );
 
     const result = await useCase.execute('doc-1');
@@ -76,7 +87,15 @@ describe('DeactivateDoctor', () => {
     const email = makeEmailService();
     const notifier = makeNotificationService();
 
-    const useCase = new DeactivateDoctor(doctors, appointments, users, makeEventPublisher(), notifier, email);
+    const useCase = new DeactivateDoctor(
+      doctors,
+      appointments,
+      users,
+      makeEventPublisher(),
+      notifier,
+      email,
+      makeQueueRepo(),
+    );
     await useCase.execute('doc-1');
     await Promise.resolve();
     await Promise.resolve();
@@ -108,6 +127,7 @@ describe('DeactivateDoctor', () => {
       makeEventPublisher(),
       makeNotificationService(),
       email,
+      makeQueueRepo(),
     );
 
     await expect(useCase.execute('doc-1')).resolves.toBeDefined();

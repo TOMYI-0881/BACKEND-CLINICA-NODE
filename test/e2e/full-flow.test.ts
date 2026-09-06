@@ -20,7 +20,7 @@ describe('E2E: flujo completo del sistema de reservas (seccion 10, Fase 6)', () 
     // 1. Registrar paciente
     const registerRes = await request(ctx.app)
       .post('/api/auth/register')
-      .send({ email: 'flujo.paciente@test.com', password: 'secret123' });
+      .send({ email: 'flujo.paciente@test.com', password: 'secret123', name: 'Flujo Paciente' });
     expect(registerRes.status).toBe(201);
 
     // 2. Autenticar paciente
@@ -151,7 +151,7 @@ describe('E2E: flujo completo del sistema de reservas (seccion 10, Fase 6)', () 
 
     await request(ctx.app)
       .post('/api/auth/register')
-      .send({ email: 'pat.mine@test.com', password: 'secret123' });
+      .send({ email: 'pat.mine@test.com', password: 'secret123', name: 'Pat Mine' });
     const patientLogin = await request(ctx.app)
       .post('/api/auth/login')
       .send({ email: 'pat.mine@test.com', password: 'secret123' });

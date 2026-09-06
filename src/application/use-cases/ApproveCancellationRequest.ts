@@ -6,7 +6,9 @@ import { UserRepository } from '../../domain/ports/UserRepository';
 import { EventPublisher } from '../../domain/ports/EventPublisher';
 import { NotificationService } from '../../domain/ports/NotificationService';
 import { EmailService } from '../../domain/ports/EmailService';
+import { QueueRepository } from '../../domain/ports/QueueRepository';
 import { computeFreeSlots } from '../../domain/entities/Availability';
+import { broadcastQueueStatus } from './broadcastQueueStatus';
 import { logError } from '../logError';
 
 /** ADMIN aprueba el pedido de cancelacion de un DOCTOR: la cita se cancela de verdad. */
@@ -19,6 +21,7 @@ export class ApproveCancellationRequest {
     private readonly events: EventPublisher,
     private readonly notifier: NotificationService,
     private readonly email: EmailService,
+    private readonly queues: QueueRepository,
   ) {}
 
   async execute(requestId: string, adminUserId: string): Promise<CancellationRequest> {
@@ -30,6 +33,7 @@ export class ApproveCancellationRequest {
 
       const date = appointment.startTime.toISOString().slice(0, 10);
       this.broadcastAvailability(appointment.doctorId, date).catch(logError);
+      broadcastQueueStatus(this.events, this.queues, appointment.doctorId, date).catch(logError);
     }
 
     return resolved;

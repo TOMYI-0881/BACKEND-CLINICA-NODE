@@ -83,7 +83,15 @@ describe('Reglas de autorizacion exactas (seccion 5/6 del criterio de aceptacion
 
 describe('DOCTOR solo puede operar su propia cola (requireAdminOrOwnDoctor)', () => {
   function buildDoctor(id: string, userId: string): Doctor {
-    return Doctor.create({ id, userId, name: 'Dr. Test', specialty: 'Test', isActive: true, createdAt: new Date() });
+    return Doctor.create({
+      id,
+      userId,
+      name: 'Dr. Test',
+      specialty: 'Test',
+      isActive: true,
+      createdAt: new Date(),
+      photoUrl: null,
+    });
   }
 
   function buildAppWithDoctor(ownerUserId: string, ownDoctorId: string) {
@@ -96,6 +104,7 @@ describe('DOCTOR solo puede operar su propia cola (requireAdminOrOwnDoctor)', ()
       ),
       update: jest.fn(),
       deactivate: jest.fn(),
+      updatePhoto: jest.fn(),
     };
     return createApp(
       buildFakeContainer({

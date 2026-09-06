@@ -1,3 +1,4 @@
+import path from 'path';
 import express, { Express } from 'express';
 import cors from 'cors';
 import pinoHttp from 'pino-http';
@@ -34,6 +35,10 @@ export function createApp(container: AppContainer): Express {
 
   app.use('/health', buildHealthRoutes(container.controllers.health));
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+  // Fotos de perfil de medicos/pacientes (uploads/photos via multer). Publico -- ya es
+  // coherente con que GET /api/doctors expone nombre/especialidad sin autenticacion.
+  app.use('/uploads', express.static(path.resolve(process.cwd(), env.uploadDir)));
 
   const apiRouter = buildApiRouter(container);
   app.use('/api', globalRateLimiter, apiRouter);

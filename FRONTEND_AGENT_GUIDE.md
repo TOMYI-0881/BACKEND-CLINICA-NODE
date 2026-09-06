@@ -118,6 +118,8 @@ interface User {
   email: string;
   role: UserRole;
   createdAt: string; // ISO 8601 UTC
+  photoUrl: string | null; // URL publica (/uploads/photos/...) o null si no subio foto
+  name: string;       // '' en cuentas DOCTOR/ADMIN (no pasan por /auth/register)
   // passwordHash NUNCA se devuelve
 }
 
@@ -128,6 +130,7 @@ interface Doctor {
   specialty: string;
   isActive: boolean;   // false = "borrado" (soft-delete), ya no aparece en GET /doctors
   createdAt: string;
+  photoUrl: string | null; // se puebla cuando el doctor sube su foto via POST /auth/me/photo
 }
 
 // CANCELLATION_REQUESTED: un DOCTOR pidio cancelar, pendiente de que ADMIN apruebe/rechace.
@@ -142,6 +145,7 @@ interface Appointment {
   endTime: string;
   status: AppointmentStatus;
   createdAt: string;
+  patientEmail?: string; // solo presente para rol DOCTOR en GET /appointments/mine
 }
 
 interface Slot {
@@ -214,8 +218,11 @@ Mapeo de status a causa:
 
 | Método | Ruta | Auth | Notas de implementación |
 |---|---|---|---|
-| POST | `/api/auth/register` | No | `{ email, password (min 6) }` → `201` con `User` (rol `PATIENT`). Después de registrar, hacé login automáticamente o mandá a la pantalla de login. |
+| POST | `/api/auth/register` | No | `{ email, password (min 6), name (min 2, max 120) }` → `201` con `User` (rol `PATIENT`). `name` es obligatorio y es el que despues se muestra en la lista de espera de la cola en vivo (`patientName` en `Turn`) cuando la cita del paciente se auto-encola. Después de registrar, hacé login automáticamente o mandá a la pantalla de login. |
 | POST | `/api/auth/login` | No | `{ email, password }` → `200` con `{ token, user }`. Sirve para los 3 roles. Guardar token + user en estado global. |
+| GET | `/api/auth/me` | Cualquier rol | Devuelve el `User` propio (mismo shape que `login`). Útil para refrescar el estado global (ej. después de cambiar la foto) sin tener que loguear de nuevo. |
+| POST | `/api/auth/me/photo` | Cualquier rol | `multipart/form-data` con campo `photo` (jpg/png/webp, tamaño máx. configurable en el backend, default 2MB). Armá el body con `FormData` (`formData.append('photo', file)`), **no** mandes `Content-Type` manual — dejá que el browser ponga el boundary. Sube o **reemplaza** la foto (una sola por usuario, opcional) → `200` con el `User` actualizado. Si el usuario es `DOCTOR`, la foto también aparece en `GET /api/doctors` automáticamente. `400` si falta el archivo, el formato no es válido, o excede el tamaño. |
+| DELETE | `/api/auth/me/photo` | Cualquier rol | Quita la foto propia (y su réplica en el perfil de doctor si aplica) → `200 { ok: true }`. |
 
 ### Doctors (gestión exclusiva de ADMIN, salvo el listado público)
 
@@ -233,7 +240,7 @@ Mapeo de status a causa:
 |---|---|---|---|
 | GET | `/api/appointments/availability?doctorId=&date=` | No | Devuelve slots de 30 min libres entre 09:00–18:00 UTC (ya excluye `CONFIRMED` y `CANCELLATION_REQUESTED`). Refrescar cada vez que cambia doctor o fecha en el calendario. |
 | POST | `/api/appointments` | PATIENT | `{ doctorId, startTime, endTime }` (el `patientId` sale del JWT, no lo mandes). En `409` (slot ya tomado por otro mientras el usuario elegía), **refrescar la disponibilidad y mostrar el conflicto**, no reintentar ciegamente. |
-| GET | `/api/appointments/mine` | PATIENT o DOCTOR | Lista propia, sin paginar. Para PATIENT: sus citas como paciente. Para DOCTOR: sus citas como doctor — **esta es la forma de obtener el `id` de una cita propia** para pedir su cancelación (ver fila de abajo), no hay otro endpoint para eso. |
+| GET | `/api/appointments/mine` | PATIENT o DOCTOR | Lista propia, sin paginar. Para PATIENT: sus citas como paciente. Para DOCTOR: sus citas como doctor — **esta es la forma de obtener el `id` de una cita propia** para pedir su cancelación (ver fila de abajo), no hay otro endpoint para eso. **Para DOCTOR, cada item trae además `patientEmail`** (no viene para PATIENT ni en `GET /api/appointments` de ADMIN) — es la forma de mostrar la identidad del paciente en la UI (ej. el carrusel de "pacientes de hoy") sin que exista un endpoint de usuarios/pacientes. |
 | GET | `/api/appointments?page=&limit=` | ADMIN | Paginado: `{ items, total, page, limit }`. Pantalla admin de todas las reservas. |
 | DELETE | `/api/appointments/:id` | PATIENT (dueño) o ADMIN | Botón "Cancelar" en "Mis turnos" (paciente) o en el listado admin. Cancelación **directa e inmediata** — distinta del flujo de pedido del DOCTOR de abajo. Actualiza `status` a `CANCELLED`, no borra el registro. |
 | POST | `/api/appointments/:id/request-cancellation` | DOCTOR (dueño de la cita) | `{ reason }` → `201` con el `CancellationRequest` en estado `pending`. El DOCTOR nunca cancela directo, esto solo *pide* la cancelación. Flujo completo en la UI: `GET /appointments/mine` (rol DOCTOR) → el usuario elige una cita de la lista → `POST` a esta ruta con su `id`. `403` si la cita es de otro doctor; `400` si la cita ya no está `CONFIRMED`. |

@@ -32,7 +32,7 @@ describe('Pedidos de cancelacion contra Postgres real', () => {
 
   it('idx_one_pending_request_per_appointment: el indice unico rechaza pedidos pendientes duplicados bajo insercion concurrente cruda', async () => {
     const doctor = await createTestDoctor(doctorRepo, { name: 'Dr. Indice', specialty: 'Test' });
-    const patient = await userRepo.save({ email: 'pat-indice@test.com', passwordHash: 'hash', role: 'PATIENT' });
+    const patient = await userRepo.save({ email: 'pat-indice@test.com', passwordHash: 'hash', role: 'PATIENT', name: 'Test' });
     const appointment = await appointmentRepo.save({
       doctorId: doctor.id,
       patientId: patient.id,
@@ -62,7 +62,7 @@ describe('Pedidos de cancelacion contra Postgres real', () => {
 
   it('create() bajo concurrencia real: exactamente un pedido tiene exito, el resto es rechazado por el guard de estado de la cita', async () => {
     const doctor = await createTestDoctor(doctorRepo, { name: 'Dr. Pedidos', specialty: 'Test' });
-    const patient = await userRepo.save({ email: 'pat-pedidos@test.com', passwordHash: 'hash', role: 'PATIENT' });
+    const patient = await userRepo.save({ email: 'pat-pedidos@test.com', passwordHash: 'hash', role: 'PATIENT', name: 'Test' });
     const appointment = await appointmentRepo.save({
       doctorId: doctor.id,
       patientId: patient.id,
@@ -104,8 +104,8 @@ describe('Pedidos de cancelacion contra Postgres real', () => {
 
   it('el EXCLUDE bloquea el horario mientras la cancelacion esta pendiente (no se puede doble-reservar durante la revision)', async () => {
     const doctor = await createTestDoctor(doctorRepo, { name: 'Dr. Bloqueo', specialty: 'Test' });
-    const patientA = await userRepo.save({ email: 'pat-a-bloqueo@test.com', passwordHash: 'hash', role: 'PATIENT' });
-    const patientB = await userRepo.save({ email: 'pat-b-bloqueo@test.com', passwordHash: 'hash', role: 'PATIENT' });
+    const patientA = await userRepo.save({ email: 'pat-a-bloqueo@test.com', passwordHash: 'hash', role: 'PATIENT', name: 'Test' });
+    const patientB = await userRepo.save({ email: 'pat-b-bloqueo@test.com', passwordHash: 'hash', role: 'PATIENT', name: 'Test' });
 
     const appointment = await appointmentRepo.save({
       doctorId: doctor.id,
@@ -133,9 +133,9 @@ describe('Pedidos de cancelacion contra Postgres real', () => {
 
   it('approve() cancela la cita de verdad y libera el horario', async () => {
     const doctor = await createTestDoctor(doctorRepo, { name: 'Dr. Aprobado', specialty: 'Test' });
-    const patientA = await userRepo.save({ email: 'pat-a-aprobado@test.com', passwordHash: 'hash', role: 'PATIENT' });
-    const patientB = await userRepo.save({ email: 'pat-b-aprobado@test.com', passwordHash: 'hash', role: 'PATIENT' });
-    const admin = await userRepo.save({ email: 'admin-aprobado@test.com', passwordHash: 'hash', role: 'ADMIN' });
+    const patientA = await userRepo.save({ email: 'pat-a-aprobado@test.com', passwordHash: 'hash', role: 'PATIENT', name: 'Test' });
+    const patientB = await userRepo.save({ email: 'pat-b-aprobado@test.com', passwordHash: 'hash', role: 'PATIENT', name: 'Test' });
+    const admin = await userRepo.save({ email: 'admin-aprobado@test.com', passwordHash: 'hash', role: 'ADMIN', name: 'Test' });
 
     const appointment = await appointmentRepo.save({
       doctorId: doctor.id,
@@ -168,8 +168,8 @@ describe('Pedidos de cancelacion contra Postgres real', () => {
 
   it('reject() vuelve la cita a CONFIRMED y el horario sigue bloqueado', async () => {
     const doctor = await createTestDoctor(doctorRepo, { name: 'Dr. Rechazado', specialty: 'Test' });
-    const patient = await userRepo.save({ email: 'pat-rechazado@test.com', passwordHash: 'hash', role: 'PATIENT' });
-    const admin = await userRepo.save({ email: 'admin-rechazado@test.com', passwordHash: 'hash', role: 'ADMIN' });
+    const patient = await userRepo.save({ email: 'pat-rechazado@test.com', passwordHash: 'hash', role: 'PATIENT', name: 'Test' });
+    const admin = await userRepo.save({ email: 'admin-rechazado@test.com', passwordHash: 'hash', role: 'ADMIN', name: 'Test' });
 
     const appointment = await appointmentRepo.save({
       doctorId: doctor.id,
@@ -192,8 +192,8 @@ describe('Pedidos de cancelacion contra Postgres real', () => {
 
   it('resolve() rechaza resolver un pedido ya resuelto', async () => {
     const doctor = await createTestDoctor(doctorRepo, { name: 'Dr. Doble Resolucion', specialty: 'Test' });
-    const patient = await userRepo.save({ email: 'pat-doble-res@test.com', passwordHash: 'hash', role: 'PATIENT' });
-    const admin = await userRepo.save({ email: 'admin-doble-res@test.com', passwordHash: 'hash', role: 'ADMIN' });
+    const patient = await userRepo.save({ email: 'pat-doble-res@test.com', passwordHash: 'hash', role: 'PATIENT', name: 'Test' });
+    const admin = await userRepo.save({ email: 'admin-doble-res@test.com', passwordHash: 'hash', role: 'ADMIN', name: 'Test' });
 
     const appointment = await appointmentRepo.save({
       doctorId: doctor.id,

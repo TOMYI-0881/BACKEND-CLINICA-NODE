@@ -4,6 +4,7 @@ export interface NewUserData {
   email: string;
   passwordHash: string;
   role: UserRole;
+  name: string;
 }
 
 /**
@@ -16,4 +17,11 @@ export interface UserRepository {
   findById(id: string): Promise<User | null>;
   /** Usado por el reset de contrasena de un doctor (ADMIN). */
   updatePasswordHash(userId: string, passwordHash: string): Promise<void>;
+  /** Foto de perfil unica y opcional; null la borra. */
+  updatePhotoUrl(userId: string, photoUrl: string | null): Promise<void>;
+  /**
+   * @throws ConflictError si el email pertenece a otro usuario.
+   * @throws NotFoundError si el usuario no existe.
+   */
+  updateProfile(userId: string, data: { name: string; email: string }): Promise<User>;
 }

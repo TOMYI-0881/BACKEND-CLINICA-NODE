@@ -37,4 +37,6 @@ export interface DoctorRepository {
   update(id: string, data: UpdateDoctorData): Promise<Doctor>;
   /** Soft-delete: nunca DELETE real (appointments/turns referencian doctors con ON DELETE NO ACTION). */
   deactivate(id: string): Promise<Doctor>;
+  /** Copia denormalizada de la foto de perfil del usuario, para que el listado publico no necesite JOIN. */
+  updatePhoto(id: string, photoUrl: string | null): Promise<Doctor>;
 }

@@ -28,11 +28,17 @@ import { NodemailerEmailService } from '../infrastructure/notifications/email/No
 
 import { RegisterUser } from '../application/use-cases/RegisterUser';
 import { LoginUser } from '../application/use-cases/LoginUser';
+import { GetMyProfile } from '../application/use-cases/GetMyProfile';
+import { UpdateMyProfile } from '../application/use-cases/UpdateMyProfile';
+import { UpdateMyPhoto } from '../application/use-cases/UpdateMyPhoto';
+import { RemoveMyPhoto } from '../application/use-cases/RemoveMyPhoto';
 import { CreateDoctor } from '../application/use-cases/CreateDoctor';
 import { ListDoctors } from '../application/use-cases/ListDoctors';
 import { UpdateDoctor } from '../application/use-cases/UpdateDoctor';
 import { DeactivateDoctor } from '../application/use-cases/DeactivateDoctor';
 import { ResetDoctorPassword } from '../application/use-cases/ResetDoctorPassword';
+import { UpdateDoctorPhoto } from '../application/use-cases/UpdateDoctorPhoto';
+import { RemoveDoctorPhoto } from '../application/use-cases/RemoveDoctorPhoto';
 import { GetAvailability } from '../application/use-cases/GetAvailability';
 import { CreateAppointment } from '../application/use-cases/CreateAppointment';
 import { CancelAppointment } from '../application/use-cases/CancelAppointment';
@@ -131,17 +137,29 @@ export function buildContainer(): AppContainer {
 
   const registerUser = new RegisterUser(users, hasher);
   const loginUser = new LoginUser(users, hasher, tokens);
+  const getMyProfile = new GetMyProfile(users);
+  const updateMyProfile = new UpdateMyProfile(users);
+  const updateMyPhoto = new UpdateMyPhoto(users, doctors);
+  const removeMyPhoto = new RemoveMyPhoto(users, doctors);
   const createDoctor = new CreateDoctor(doctors, hasher);
   const listDoctors = new ListDoctors(doctors);
   const updateDoctor = new UpdateDoctor(doctors);
-  const deactivateDoctor = new DeactivateDoctor(doctors, appointments, users, events, notifier, email);
+  const deactivateDoctor = new DeactivateDoctor(doctors, appointments, users, events, notifier, email, queues);
   const resetDoctorPassword = new ResetDoctorPassword(doctors, users, hasher, email);
+  const updateDoctorPhoto = new UpdateDoctorPhoto(doctors, users);
+  const removeDoctorPhoto = new RemoveDoctorPhoto(doctors, users);
   const getAvailability = new GetAvailability(appointments);
-  const createAppointment = new CreateAppointment(appointments, lock, events, notifier);
-  const cancelAppointment = new CancelAppointment(appointments, users, events, notifier, email);
+  const createAppointment = new CreateAppointment(appointments, lock, events, notifier, users, queues);
+  const cancelAppointment = new CancelAppointment(appointments, users, events, notifier, email, queues);
   const listAppointments = new ListAppointments(appointments);
   const listMyAppointments = new ListMyAppointments(appointments, doctors);
-  const requestAppointmentCancellation = new RequestAppointmentCancellation(appointments, doctors, cancellationRequests);
+  const requestAppointmentCancellation = new RequestAppointmentCancellation(
+    appointments,
+    doctors,
+    cancellationRequests,
+    events,
+    queues,
+  );
   const approveCancellationRequest = new ApproveCancellationRequest(
     cancellationRequests,
     appointments,
@@ -150,14 +168,15 @@ export function buildContainer(): AppContainer {
     events,
     notifier,
     email,
+    queues,
   );
-  const rejectCancellationRequest = new RejectCancellationRequest(cancellationRequests);
+  const rejectCancellationRequest = new RejectCancellationRequest(cancellationRequests, appointments, events, queues);
   const listPendingCancellationRequests = new ListPendingCancellationRequests(cancellationRequests);
   const checkInPatient = new CheckInPatient(queues, appointments, lock, events);
   const callNextTurn = new CallNextTurn(queues, events);
   const skipTurn = new SkipTurn(queues, events);
   const recallCurrentTurn = new RecallCurrentTurn(queues, events);
-  const getQueueStatus = new GetQueueStatus(queues);
+  const getQueueStatus = new GetQueueStatus(queues, appointments);
 
   return {
     pgPool,
@@ -166,8 +185,23 @@ export function buildContainer(): AppContainer {
     tokens,
     repositories: { users, doctors, appointments, queues, cancellationRequests },
     controllers: {
-      auth: createAuthController({ registerUser, loginUser }),
-      doctors: createDoctorsController({ createDoctor, listDoctors, updateDoctor, deactivateDoctor, resetDoctorPassword }),
+      auth: createAuthController({
+        registerUser,
+        loginUser,
+        getMyProfile,
+        updateMyProfile,
+        updateMyPhoto,
+        removeMyPhoto,
+      }),
+      doctors: createDoctorsController({
+        createDoctor,
+        listDoctors,
+        updateDoctor,
+        deactivateDoctor,
+        resetDoctorPassword,
+        updateDoctorPhoto,
+        removeDoctorPhoto,
+      }),
       appointments: createAppointmentsController({
         createAppointment,
         cancelAppointment,

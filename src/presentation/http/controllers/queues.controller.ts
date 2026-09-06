@@ -35,10 +35,12 @@ export function createQueuesController(deps: QueuesControllerDeps): QueuesContro
   const status = asyncHandler(async (req, res) => {
     const doctorId = req.params['doctorId'] as string;
     const { date } = QueueDateSchema.parse(req.query);
-    const result = await deps.getQueueStatus.execute(doctorId, date ?? todayUtc());
+    const patientId = req.user?.role === 'PATIENT' ? req.user.userId : undefined;
+    const result = await deps.getQueueStatus.execute(doctorId, date ?? todayUtc(), patientId);
     res.status(200).json({
       current: result.current?.toJSON() ?? null,
       waiting: result.waiting.map((turn) => turn.toJSON()),
+      myTurn: result.myTurn?.toJSON() ?? null,
     });
   });
 

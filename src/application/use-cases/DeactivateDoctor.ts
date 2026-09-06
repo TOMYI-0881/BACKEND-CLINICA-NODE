@@ -5,7 +5,9 @@ import { UserRepository } from '../../domain/ports/UserRepository';
 import { EventPublisher } from '../../domain/ports/EventPublisher';
 import { NotificationService } from '../../domain/ports/NotificationService';
 import { EmailService } from '../../domain/ports/EmailService';
+import { QueueRepository } from '../../domain/ports/QueueRepository';
 import { computeFreeSlots } from '../../domain/entities/Availability';
+import { broadcastQueueStatus } from './broadcastQueueStatus';
 import { logError } from '../logError';
 
 /**
@@ -22,6 +24,7 @@ export class DeactivateDoctor {
     private readonly events: EventPublisher,
     private readonly notifier: NotificationService,
     private readonly email: EmailService,
+    private readonly queues: QueueRepository,
   ) {}
 
   async execute(doctorId: string): Promise<Doctor> {
@@ -38,6 +41,7 @@ export class DeactivateDoctor {
 
     for (const date of affectedDates) {
       this.broadcastAvailability(doctorId, date).catch(logError);
+      broadcastQueueStatus(this.events, this.queues, doctorId, date).catch(logError);
     }
 
     return doctor;

@@ -4,6 +4,7 @@ import { PasswordHasher } from '../../../src/domain/ports/PasswordHasher';
 import { TokenService } from '../../../src/domain/ports/TokenService';
 import { User } from '../../../src/domain/entities/User';
 import { UnauthorizedError } from '../../../src/domain/errors/UnauthorizedError';
+import { RegisterUserSchema } from '../../../src/application/dtos/RegisterUserDto';
 import { makeUserRepo } from './mocks';
 
 function makeHasher(): jest.Mocked<PasswordHasher> {
@@ -25,17 +26,20 @@ describe('RegisterUser', () => {
       passwordHash: 'hashed-pw',
       role: 'PATIENT',
       createdAt: new Date(),
+      photoUrl: null,
+      name: 'Juan Perez',
     });
     users.save.mockResolvedValue(savedUser);
 
     const useCase = new RegisterUser(users, hasher);
-    const result = await useCase.execute({ email: 'paciente@test.com', password: 'plain123' });
+    const result = await useCase.execute({ email: 'paciente@test.com', password: 'plain123', name: 'Juan Perez' });
 
     expect(hasher.hash).toHaveBeenCalledWith('plain123');
     expect(users.save).toHaveBeenCalledWith({
       email: 'paciente@test.com',
       passwordHash: 'hashed-pw',
       role: 'PATIENT',
+      name: 'Juan Perez',
     });
     expect(result).toBe(savedUser);
   });
@@ -47,9 +51,31 @@ describe('RegisterUser', () => {
     users.save.mockRejectedValue(new Error('email duplicado'));
 
     const useCase = new RegisterUser(users, hasher);
-    await expect(useCase.execute({ email: 'dup@test.com', password: 'plain123' })).rejects.toThrow(
-      'email duplicado',
-    );
+    await expect(
+      useCase.execute({ email: 'dup@test.com', password: 'plain123', name: 'Juan Perez' }),
+    ).rejects.toThrow('email duplicado');
+  });
+});
+
+describe('RegisterUserSchema (validacion de name)', () => {
+  it('rechaza el registro sin name', () => {
+    const result = RegisterUserSchema.safeParse({ email: 'paciente@test.com', password: 'plain123' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rechaza name de 1 caracter', () => {
+    const result = RegisterUserSchema.safeParse({ email: 'paciente@test.com', password: 'plain123', name: 'A' });
+    expect(result.success).toBe(false);
+  });
+
+  it('acepta un name valido y lo trimea', () => {
+    const result = RegisterUserSchema.safeParse({
+      email: 'paciente@test.com',
+      password: 'plain123',
+      name: '  Juan Perez  ',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.name).toBe('Juan Perez');
   });
 });
 
@@ -60,6 +86,8 @@ describe('LoginUser', () => {
     passwordHash: 'hashed-pw',
     role: 'PATIENT',
     createdAt: new Date(),
+    photoUrl: null,
+    name: 'Juan Perez',
   });
 
   it('retorna un token JWT cuando las credenciales son validas', async () => {
