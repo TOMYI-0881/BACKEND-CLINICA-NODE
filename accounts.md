@@ -2,7 +2,8 @@
 
 Datos leídos directamente de la tabla `users` (y `doctors` para el detalle de especialidad)
 de la base `clinica` corriendo en el contenedor `backend-clinica-node-postgres-1`.
-Regenerado el 2026-09-06.
+Regenerado el 2026-09-06 (tras corregir `DATABASE_URL` en `.env`, que apuntaba al puerto 5432 en
+vez de 5434, y re-crear tablas/datos porque la base había quedado sin tablas).
 
 > Las contraseñas están hasheadas con bcrypt en la base — no son recuperables. Se indica la
 > contraseña conocida solo donde el origen del dato la revela (el seed de doctores).
@@ -20,7 +21,7 @@ esta se insertó manualmente en la base.
 
 | email | user_id | contraseña |
 |---|---|---|
-| admin@clinica.test | 1211b245-b66d-46cd-bbca-b87de1c58f5b | `admin123` |
+| admin@clinica.test | 64f32e9b-55c6-4f03-8766-9db4d538ff31 | `admin123` |
 
 ## DOCTOR
 
@@ -29,11 +30,11 @@ Creados por `npm run seed` (`scripts/seed.ts`). Todos comparten la misma contras
 
 | nombre | especialidad | email | doctor_id | user_id | activo |
 |---|---|---|---|---|---|
-| Dra. Ana Fernandez | Cardiologia | ana.fernandez@clinica.test | 84a041e8-24eb-41a8-9fae-351edaafcbed | 248b22ea-44bc-4bcc-8ee9-36fe37f16421 | sí |
-| Dr. Bruno Gimenez | Pediatria | bruno.gimenez@clinica.test | d24be2a0-195f-431d-a7f8-4d58eb142385 | c0f9dce7-94c3-41df-8884-27caf1de88b8 | sí |
-| Dra. Carla Lopez | Dermatologia | carla.lopez@clinica.test | cd8be646-9e11-441d-b4d8-69ce9ce8cdd2 | ec6c9f2b-73c5-407a-8d37-1f12aa4b0635 | sí |
-| Dr. Diego Martinez | Traumatologia | diego.martinez@clinica.test | 6bd9c620-3c68-4966-b766-29fa3dade028 | 2d6215d6-a9a8-4b85-ba29-93c854f6bd8a | sí |
-| Dra. Elena Suarez | Clinica Medica | elena.suarez@clinica.test | 8001a566-3286-4cca-a989-d8823a5cefe9 | a1020ff5-2c18-40dc-9a79-d8ca5e97e8c5 | sí |
+| Dra. Ana Fernandez | Cardiologia | ana.fernandez@clinica.test | c235a7b8-343b-483a-a111-5ac1f352431b | 71decf94-9e3e-4e8a-b1a9-bfdc7bc8a22c | sí |
+| Dr. Bruno Gimenez | Pediatria | bruno.gimenez@clinica.test | 1226037a-c592-4ddd-a8d3-be64237ae49d | c579580c-4272-4f5c-9e2d-8d7019cb0993 | sí |
+| Dra. Carla Lopez | Dermatologia | carla.lopez@clinica.test | b0fb359f-654c-4021-ac8b-342db788821f | 63899684-3280-4807-9376-d0922b0e656f | sí |
+| Dr. Diego Martinez | Traumatologia | diego.martinez@clinica.test | 42156146-e209-46f8-b51e-7821192178b5 | 63af1bf4-d216-4d8d-a51e-ebc04e378e1b | sí |
+| Dra. Elena Suarez | Clinica Medica | elena.suarez@clinica.test | 8eae9f44-25f8-4571-a2d3-9d5b24afde77 | 162ca7ae-54c3-4406-b37d-ebf6bbf59e00 | sí |
 
 ## PATIENT
 
