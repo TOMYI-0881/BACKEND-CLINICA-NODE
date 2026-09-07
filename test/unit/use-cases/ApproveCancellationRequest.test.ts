@@ -53,6 +53,7 @@ describe('ApproveCancellationRequest', () => {
         userId: 'u1',
         name: 'Dr. Test',
         specialty: 'Test',
+        gender: 'male',
         isActive: true,
         createdAt: new Date(),
         photoUrl: null,

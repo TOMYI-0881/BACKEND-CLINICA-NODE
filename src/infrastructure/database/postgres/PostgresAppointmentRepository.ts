@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { Appointment, AppointmentStatus } from '../../../domain/entities/Appointment';
 import {
   AppointmentRepository,
+  DashboardStats,
   NewAppointmentData,
   PaginatedResult,
 } from '../../../domain/ports/AppointmentRepository';
@@ -198,5 +199,54 @@ export class PostgresAppointmentRepository implements AppointmentRepository {
     const row = result.rows[0];
     if (!row) throw new NotFoundError('Reserva no encontrada');
     return toDomain(row);
+  }
+
+  async getDashboardStats(): Promise<DashboardStats> {
+    const [totals, byStatus, pending] = await Promise.all([
+      this.pool.query<{
+        total_citas: number;
+        citas_hoy: number;
+        proximas_citas: number;
+        total_pacientes: number;
+        total_doctores_activos: number;
+        total_doctores_inactivos: number;
+      }>(
+        `SELECT
+           (SELECT COUNT(*)::int FROM appointments) AS total_citas,
+           (SELECT COUNT(*)::int FROM appointments
+              WHERE (start_time AT TIME ZONE 'UTC')::date = CURRENT_DATE) AS citas_hoy,
+           (SELECT COUNT(*)::int FROM appointments
+              WHERE status IN ('CONFIRMED', 'CANCELLATION_REQUESTED') AND start_time >= now()) AS proximas_citas,
+           (SELECT COUNT(*)::int FROM users WHERE role = 'PATIENT') AS total_pacientes,
+           (SELECT COUNT(*)::int FROM doctors WHERE is_active = true) AS total_doctores_activos,
+           (SELECT COUNT(*)::int FROM doctors WHERE is_active = false) AS total_doctores_inactivos`,
+      ),
+      this.pool.query<{ status: AppointmentStatus; count: number }>(
+        `SELECT status, COUNT(*)::int AS count FROM appointments GROUP BY status`,
+      ),
+      this.pool.query<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM appointment_cancellation_requests WHERE status = 'pending'`,
+      ),
+    ]);
+
+    const citasPorEstado: Record<AppointmentStatus, number> = {
+      CONFIRMED: 0,
+      CANCELLED: 0,
+      CANCELLATION_REQUESTED: 0,
+      COMPLETED: 0,
+    };
+    for (const row of byStatus.rows) citasPorEstado[row.status] = row.count;
+
+    const t = totals.rows[0];
+    return {
+      citasPorEstado,
+      citasHoy: t?.citas_hoy ?? 0,
+      proximasCitas: t?.proximas_citas ?? 0,
+      totalCitas: t?.total_citas ?? 0,
+      totalPacientes: t?.total_pacientes ?? 0,
+      totalDoctoresActivos: t?.total_doctores_activos ?? 0,
+      totalDoctoresInactivos: t?.total_doctores_inactivos ?? 0,
+      cancelacionesPendientes: pending.rows[0]?.count ?? 0,
+    };
   }
 }

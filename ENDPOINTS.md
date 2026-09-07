@@ -39,6 +39,7 @@ usá la documentación OpenAPI/Swagger servida en **`GET /api-docs`** con la API
 | POST   | [`/api/queues/:doctorId/next`](#post-apiqueuesdoctoridnext)                                 | JWT        | ADMIN o DOCTOR (dueño)          |
 | POST   | [`/api/queues/:doctorId/skip`](#post-apiqueuesdoctoridskip)                                 | JWT        | ADMIN o DOCTOR (dueño)          |
 | POST   | [`/api/queues/:doctorId/call`](#post-apiqueuesdoctoridcall)                                 | JWT        | ADMIN o DOCTOR (dueño)          |
+| GET    | [`/api/admin/dashboard/stats`](#get-apiadmindashboardstats)                                 | JWT        | ADMIN                           |
 | POST   | [`/api/webhooks/github`](#post-apiwebhooksgithub)                                           | Firma HMAC | -                               |
 | GET    | [`/health`](#get-health)                                                                    | No         | -                               |
 | GET    | [`/api-docs`](#get-api-docs)                                                                | No         | -                               |
@@ -186,8 +187,10 @@ Borra también el archivo del disco. Sirve para los 3 roles.
 
 Lista los doctores **activos**. Público.
 
-`photoUrl` se puebla automáticamente cuando ese doctor sube su foto vía
-`POST /api/auth/me/photo` estando logueado con su propia cuenta — no hay una ruta separada
+`name` es el nombre real, **sin** el prefijo "Dr./Dra." (el backend lo rechaza si se lo
+mandan al crear/editar — ese prefijo es responsabilidad de presentación del frontend, que lo
+antepone según `gender`). `photoUrl` se puebla automáticamente cuando ese doctor sube su foto
+vía `POST /api/auth/me/photo` estando logueado con su propia cuenta — no hay una ruta separada
 para setearla desde acá.
 
 ```json
@@ -196,8 +199,9 @@ para setearla desde acá.
   {
     "id": "uuid",
     "userId": "uuid",
-    "name": "Dra. Ana Fernandez",
+    "name": "Ana Fernandez",
     "specialty": "Cardiologia",
+    "gender": "female",
     "isActive": true,
     "createdAt": "2026-...",
     "photoUrl": null
@@ -207,36 +211,44 @@ para setearla desde acá.
 
 ### `POST /api/doctors`
 
-Crea un doctor **junto con su cuenta de usuario** (rol `DOCTOR`, para que pueda loguearse).
-Requiere JWT de rol **ADMIN**.
+Crea un doctor **junto con su cuenta de usuario** (rol `DOCTOR`, para que pueda loguearse). Al
+crearlo, `users.name` queda sincronizado con el `name` del doctor (antes quedaba `''`, por lo
+que el doctor veía su email en vez de su nombre al loguear). Requiere JWT de rol **ADMIN**.
 
 **Body**
 
 ```json
 {
-  "name": "Dra. Ana Fernandez",
+  "name": "Ana Fernandez",
   "specialty": "Cardiologia",
   "email": "ana@clinica.com",
-  "password": "secret123"
+  "password": "secret123",
+  "gender": "female"
 }
 ```
 
+- `name`: **no debe incluir el prefijo** `Dr.`/`Dra.` — se rechaza con `400` si lo incluye
 - `email`: formato email, único (409 si ya existe)
 - `password`: mínimo 6 caracteres — el doctor la usa para loguearse en `POST /auth/login`
+- `gender`: `"male"` o `"female"`, obligatorio (el frontend lo usa para elegir el prefijo de
+  presentación)
 
-**Respuestas**: `201` creado · `400` datos inválidos · `401` sin JWT · `403` rol distinto de ADMIN · `409` email ya registrado
+**Respuestas**: `201` creado · `400` datos inválidos (falta `gender`, o `name` trae el prefijo) · `401` sin JWT · `403` rol distinto de ADMIN · `409` email ya registrado
 
 ### `PATCH /api/doctors/:id`
 
-Edita `name` y/o `specialty` (no toca la cuenta/email). Requiere JWT de rol **ADMIN**.
+Edita `name`, `specialty` y/o `gender` (no toca la cuenta/email). Si cambia `name`, también
+se re-sincroniza `users.name`. Requiere JWT de rol **ADMIN**.
 
-**Body** (al menos uno de los dos)
+**Body** (al menos uno de los tres)
 
 ```json
-{ "name": "Nuevo Nombre", "specialty": "Nueva Especialidad" }
+{ "name": "Nuevo Nombre", "specialty": "Nueva Especialidad", "gender": "male" }
 ```
 
-**Respuestas**: `200` actualizado · `404` doctor no encontrado
+- `name`, si se manda, tampoco puede incluir el prefijo `Dr.`/`Dra.` (mismo `400` que en create)
+
+**Respuestas**: `200` actualizado · `400` datos inválidos · `404` doctor no encontrado
 
 ### `DELETE /api/doctors/:id`
 
@@ -257,6 +269,12 @@ Requiere JWT de rol **ADMIN**.
 ---
 
 ## Appointments
+
+Estados posibles de una cita: `CONFIRMED`, `CANCELLED`, `CANCELLATION_REQUESTED` (pedido de
+cancelación de un DOCTOR, pendiente de aprobación de ADMIN) y `COMPLETED` (el paciente ya fue
+atendido — se marca solo, cuando el turno vinculado se cierra como `done` en la cola, o de
+forma perezosa al reservar una cita nueva si el horario de una cita activa anterior ya pasó).
+Ninguna ruta permite setear `COMPLETED` directamente.
 
 ### `GET /api/appointments/availability`
 
@@ -294,15 +312,23 @@ Crea una reserva para el paciente autenticado. Requiere JWT de rol **PATIENT**.
 
 - `endTime` debe ser posterior a `startTime` (validado por zod y por la BD)
 
+**Regla "una cita por médico por día calendario" (UTC)**: un paciente no puede tener más de
+una cita `CONFIRMED`/`CANCELLATION_REQUESTED`/`COMPLETED` con el mismo médico el mismo día. Sí
+puede tener citas `CONFIRMED` con el mismo médico en **días distintos**, y puede cambiar de
+horario el mismo día cancelando y reservando de nuevo (antes de ser atendido). El mensaje de
+error distingue si la cita en conflicto ya fue atendida o no:
+
 **Respuestas**
 
-| Status | Cuándo                                               |
-| ------ | ---------------------------------------------------- |
-| 201    | Reserva creada                                       |
-| 400    | Datos inválidos                                      |
-| 401    | Sin JWT                                              |
-| 403    | Rol distinto de PATIENT                              |
-| 409    | Horario ya reservado para ese doctor (superposición) |
+| Status | Cuándo                                                                                   |
+| ------ | ----------------------------------------------------------------------------------------- |
+| 201    | Reserva creada                                                                             |
+| 400    | Datos inválidos                                                                            |
+| 401    | Sin JWT                                                                                    |
+| 403    | Rol distinto de PATIENT                                                                    |
+| 409    | `"Horario ya reservado"` / `"Ya tenes otra cita en ese horario con otro medico"` — superposición de horario con ese u otro médico |
+| 409    | `"Ya tenés una cita con este doctor para ese día. Esperá a ser atendido."` — ya hay una cita activa (no atendida) ese mismo día con ese médico |
+| 409    | `"Ya fuiste atendido por este doctor hoy. Podés reservar para otro día."` — la cita de ese día con ese médico ya está `COMPLETED` |
 
 ### `GET /api/appointments/mine`
 
@@ -460,10 +486,14 @@ FIFO). Público.
 
 **Query params**: `date` (opcional, `YYYY-MM-DD`, default hoy)
 
+`photoUrl` sale de `users.photo_url` del paciente de la cita vinculada (`appointment_id`),
+resuelto vía `appointments.patient_id` — `null` en walk-ins (sin cita) o si el paciente no
+subió foto.
+
 ```json
 // 200
-{ "current": { "id": "...", "number": 3, "priority": "preferente", "status": "in-progress", ... } | null,
-  "waiting": [ { "id": "...", "number": 1, "priority": "normal", "status": "waiting", ... } ] }
+{ "current": { "id": "...", "number": 3, "priority": "preferente", "status": "in-progress", "photoUrl": null, ... } | null,
+  "waiting": [ { "id": "...", "number": 1, "priority": "normal", "status": "waiting", "photoUrl": "/uploads/photos/...", ... } ] }
 ```
 
 ### `POST /api/queues/:doctorId/next`
@@ -487,6 +517,35 @@ Re-anuncia el turno en curso por WebSocket, sin cambiar su estado. Requiere JWT 
 **ADMIN** o **DOCTOR (dueño)**.
 
 **Respuestas**: `200` turno actual · `404` no hay turno en curso
+
+---
+
+## Admin
+
+### `GET /api/admin/dashboard/stats`
+
+Métricas agregadas del sistema en una sola llamada (3 queries en paralelo del lado del
+servidor). Requiere JWT de rol **ADMIN**.
+
+```json
+// 200
+{
+  "citasPorEstado": { "CONFIRMED": 12, "CANCELLED": 3, "CANCELLATION_REQUESTED": 1, "COMPLETED": 40 },
+  "citasHoy": 5,
+  "proximasCitas": 8,
+  "totalCitas": 56,
+  "totalPacientes": 30,
+  "totalDoctoresActivos": 5,
+  "totalDoctoresInactivos": 1,
+  "cancelacionesPendientes": 1
+}
+```
+
+- `citasHoy`: citas (cualquier estado) cuyo `start_time` cae en el día de hoy (UTC)
+- `proximasCitas`: citas `CONFIRMED`/`CANCELLATION_REQUESTED` con `start_time` futuro
+- `cancelacionesPendientes`: pedidos de cancelación en estado `pending`
+
+**Respuestas**: `200` estadísticas · `401` sin JWT · `403` rol distinto de ADMIN
 
 ---
 

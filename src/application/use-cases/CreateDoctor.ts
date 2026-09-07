@@ -16,6 +16,7 @@ export class CreateDoctor {
       specialty: dto.specialty,
       email: dto.email,
       passwordHash,
+      gender: dto.gender,
     });
   }
 }

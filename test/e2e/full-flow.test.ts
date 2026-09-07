@@ -44,7 +44,13 @@ describe('E2E: flujo completo del sistema de reservas (seccion 10, Fase 6)', () 
     const createDoctorRes = await request(ctx.app)
       .post('/api/doctors')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Dr. E2E', specialty: 'Clinica Medica', email: 'dr.e2e@test.com', password: 'secret123' });
+      .send({
+        name: 'Doctor E2E',
+        specialty: 'Clinica Medica',
+        email: 'dr.e2e@test.com',
+        password: 'secret123',
+        gender: 'male',
+      });
     expect(createDoctorRes.status).toBe(201);
     const doctorId = createDoctorRes.body.id as string;
 

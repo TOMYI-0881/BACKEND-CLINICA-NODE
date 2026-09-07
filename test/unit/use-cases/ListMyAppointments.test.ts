@@ -22,6 +22,7 @@ function buildDoctor(id: string, userId: string): Doctor {
     userId,
     name: 'Dr. Test',
     specialty: 'Test',
+    gender: 'male',
     isActive: true,
     createdAt: new Date(),
     photoUrl: null,

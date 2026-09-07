@@ -92,13 +92,13 @@ los doctores de ejemplo:
 ```bash
 # El .env por default apunta a localhost:5434 (el puerto host de postgres de arriba)
 npm run migrate:up
-npm run seed        # crea 5 doctores de ejemplo, cada uno con su propia cuenta DOCTOR
+npm run seed        # crea 5 doctores de ejemplo + la cuenta ADMIN, si todavia no existen
 ```
 
 El seed crea, por ejemplo, `ana.fernandez@clinica.test` / `clinica123` (mismo password para
-los 5 — ver la salida del comando para la lista completa). Para probar el flujo de `ADMIN`
-necesitás insertar un usuario con `role = 'ADMIN'` directo en la base — no hay endpoint
-público para crearlo (es intencional, ver `AI-CONTEXT.md`).
+los 5 — ver la salida del comando para la lista completa) y `admin@clinica.test` / `admin123`.
+No hay endpoint público para crear cuentas `ADMIN` (es intencional, ver `AI-CONTEXT.md`), pero
+el seed la garantiza por defecto en cualquier entorno nuevo — no hace falta insertarla a mano.
 
 ### Documentación de la API
 

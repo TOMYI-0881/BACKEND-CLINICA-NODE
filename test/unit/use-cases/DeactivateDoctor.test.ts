@@ -18,6 +18,7 @@ function buildDoctor(overrides: Partial<{ isActive: boolean }> = {}): Doctor {
     userId: 'user-doc-1',
     name: 'Dr. Baja',
     specialty: 'Cardiologia',
+    gender: 'male',
     isActive: overrides.isActive ?? false,
     createdAt: new Date(),
     photoUrl: null,

@@ -4,6 +4,7 @@ import { ValidationError } from '../../../src/domain/errors/ValidationError';
 const baseProps = {
   id: 'doc-1',
   userId: 'user-1',
+  gender: 'female' as const,
   isActive: true,
   createdAt: new Date(),
   photoUrl: null,
@@ -11,8 +12,8 @@ const baseProps = {
 
 describe('Doctor', () => {
   it('crea un doctor valido', () => {
-    const doctor = Doctor.create({ ...baseProps, name: 'Dra. Ana Perez', specialty: 'Cardiologia' });
-    expect(doctor.name).toBe('Dra. Ana Perez');
+    const doctor = Doctor.create({ ...baseProps, name: 'Ana Perez', specialty: 'Cardiologia' });
+    expect(doctor.name).toBe('Ana Perez');
     expect(doctor.userId).toBe('user-1');
     expect(doctor.isActive).toBe(true);
   });
@@ -22,6 +23,12 @@ describe('Doctor', () => {
   });
 
   it('rechaza especialidad vacia', () => {
-    expect(() => Doctor.create({ ...baseProps, name: 'Dra. Ana Perez', specialty: '' })).toThrow(ValidationError);
+    expect(() => Doctor.create({ ...baseProps, name: 'Ana Perez', specialty: '' })).toThrow(ValidationError);
+  });
+
+  it('rechaza genero invalido', () => {
+    expect(() =>
+      Doctor.create({ ...baseProps, name: 'Ana Perez', specialty: 'Cardiologia', gender: 'other' as never }),
+    ).toThrow(ValidationError);
   });
 });

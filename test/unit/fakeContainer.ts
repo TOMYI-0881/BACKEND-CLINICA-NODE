@@ -28,6 +28,7 @@ export function buildFakeContainer(overrides: Partial<AppContainer> = {}): AppCo
       cancellationRequests: { list: ok, approve: ok, reject: ok },
       webhooks: { github: ok },
       health: { health: (_req, res) => res.status(200).json({ status: 'ok' }) },
+      admin: { dashboardStats: ok },
     },
     ...overrides,
   };

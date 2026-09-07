@@ -18,6 +18,7 @@ export function makeAppointmentRepo(): jest.Mocked<AppointmentRepository> {
     findBlockingByDoctorAndDate: jest.fn().mockResolvedValue([]),
     findFutureConfirmedByDoctor: jest.fn().mockResolvedValue([]),
     cancel: jest.fn(),
+    getDashboardStats: jest.fn(),
   };
 }
 

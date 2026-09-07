@@ -5,6 +5,7 @@ import { buildDoctorsRoutes } from './doctors.routes';
 import { buildAppointmentsRoutes } from './appointments.routes';
 import { buildQueuesRoutes } from './queues.routes';
 import { buildCancellationRequestsRoutes } from './cancellationRequests.routes';
+import { buildAdminRoutes } from './admin.routes';
 import { buildWebhooksRoutes } from './webhooks.routes';
 import { env } from '../../../config/env';
 
@@ -37,6 +38,7 @@ export function buildApiRouter(container: AppContainer): Router {
     jsonBody,
     buildCancellationRequestsRoutes(container.controllers.cancellationRequests, container.tokens),
   );
+  router.use('/admin', jsonBody, buildAdminRoutes(container.controllers.admin, container.tokens));
   router.use('/webhooks', buildWebhooksRoutes(container.controllers.webhooks, env.githubWebhookSecret));
 
   return router;

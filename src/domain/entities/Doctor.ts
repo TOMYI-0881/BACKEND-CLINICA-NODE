@@ -1,10 +1,13 @@
 import { ValidationError } from '../errors/ValidationError';
 
+export type DoctorGender = 'male' | 'female';
+
 export interface DoctorProps {
   id: string;
   userId: string;
   name: string;
   specialty: string;
+  gender: DoctorGender;
   isActive: boolean;
   createdAt: Date;
   photoUrl: string | null;
@@ -19,6 +22,9 @@ export class Doctor {
     }
     if (!props.specialty.trim()) {
       throw new ValidationError('El doctor debe tener una especialidad');
+    }
+    if (props.gender !== 'male' && props.gender !== 'female') {
+      throw new ValidationError('Genero de doctor invalido');
     }
     return new Doctor(props);
   }
@@ -37,6 +43,10 @@ export class Doctor {
 
   get specialty(): string {
     return this.props.specialty;
+  }
+
+  get gender(): DoctorGender {
+    return this.props.gender;
   }
 
   get isActive(): boolean {

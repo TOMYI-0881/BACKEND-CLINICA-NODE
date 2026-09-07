@@ -10,6 +10,7 @@ describe('UpdateDoctor', () => {
       userId: 'user-1',
       name: 'Nuevo Nombre',
       specialty: 'Cardiologia',
+      gender: 'male',
       isActive: true,
       createdAt: new Date(),
       photoUrl: null,

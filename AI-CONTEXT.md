@@ -180,6 +180,94 @@ un `DOCTOR` tampoco tiene forma de descubrir su propio `Doctor.id` (el que usan 
 `/queues/:doctorId/*`) sin filtrar `GET /doctors` a mano — ver sección 3 de
 `FRONTEND_AGENT_GUIDE.md`.
 
+## Extensión post-entrega: género de doctor, regla de citas por día, y dashboard de ADMIN
+
+En una sesión posterior se pidieron 4 cosas más, también fuera del alcance del documento
+maestro: (1) relajar la regla de "una cita activa por médico" a nivel de día calendario, con
+mensajes de error distintos según si la cita en conflicto ya fue atendida, (2) separar el
+prefijo "Dr./Dra." del nombre guardado y agregar género, sincronizando `users.name`, (3) fotos
+de perfil por defecto para los doctores de ejemplo y una cuenta ADMIN creada automáticamente
+por el seed, y (4) un endpoint de métricas agregadas para ADMIN.
+
+### Estado `COMPLETED` y regla "una cita por médico por día" (no por médico "a secas")
+
+La regla original (`idx_one_active_appointment_per_patient_doctor`, sección 5) bloqueaba una
+segunda cita activa con el mismo médico **en cualquier fecha futura** — un paciente ya atendido
+no podía volver a reservar con ese médico nunca más, porque las citas pasadas nunca cambiaban
+de estado. Se agregó el estado terminal `COMPLETED` (marcado al cerrar el turno de cola como
+`done`, o de forma perezosa al reservar si una cita activa anterior del mismo par
+paciente+médico ya pasó) y se reemplazó el índice por uno compuesto con el día calendario UTC:
+`(patient_id, doctor_id, (start_time AT TIME ZONE 'UTC')::date)`. Nota técnica: Postgres exige
+que las expresiones de un índice sean `IMMUTABLE`; `start_time::date` a secas no lo es (depende
+del timezone de sesión) y la migración fue rechazada hasta fijar `AT TIME ZONE 'UTC'`
+explícitamente — que además coincide exactamente con la convención de "día" que ya usaba
+`dateKey()` en el frontend/backend. Efecto: `CONFIRMED` con el mismo médico en días distintos
+ahora se permite (relajación real), pero el mismo día sigue bloqueado tanto si la cita anterior
+está activa como si ya fue atendida — solo cambia el mensaje que ve el paciente
+(`"Esperá a ser atendido"` vs. `"Podés reservar para otro día"`), resuelto con un pre-chequeo
+`SELECT` antes del `INSERT` (el índice único por sí solo no distingue el motivo del conflicto).
+Al migrar una base con datos reales de desarrollo se encontraron filas que ya violaban el nuevo
+índice (múltiples citas del mismo día generadas probando el flujo manualmente); se resolvieron
+a mano antes de aplicar la migración, no automáticamente, para no descartar datos sin confirmar
+con el usuario.
+
+### Género de doctor y sincronización de `users.name`
+
+`doctors.name` guardaba el nombre **con** el prefijo "Dr./Dra." (ej. "Dra. Ana Fernandez"). Se
+agregó `doctors.gender` (`male`/`female`) para que el prefijo sea una decisión de presentación
+del frontend, no un dato persistido — la migración hace backfill del género a partir del
+prefijo existente (con un fallback heurístico por terminación del nombre en "a" para filas sin
+prefijo) y limpia el nombre. De paso se corrigió un bug real: `createDoctorAccount` nunca
+escribía `name` en el `INSERT` de `users`, así que un doctor logueado veía su email en el header
+en vez de su nombre (`users.name` quedaba `''`). Ahora se escribe al crear y se re-sincroniza en
+cada `PATCH /doctors/:id` que cambie el nombre, dentro de la misma transacción.
+
+### Fotos de doctores y ADMIN por defecto en el seed
+
+Las 5 fotos de ejemplo (`public/image/`, versionadas en git) se copian a `uploads/photos/`
+(gitignorado, contenido runtime) la primera vez que corre `npm run seed`, siguiendo la misma
+convención de "el seed es idempotente" que ya tenían los doctores. La cuenta `admin@clinica.test`
+/ `admin123` también la crea el seed si no existe — antes había que insertarla a mano en cada
+entorno nuevo (documentado como intencional en la sección "Roles" de este archivo, porque no
+hay endpoint público para crear ADMIN), lo cual era fácil de olvidar al recrear el entorno desde
+cero. Seguir sin endpoint público sigue siendo la decisión correcta (crear un ADMIN es una
+acción sensible); que el seed la garantice por defecto solo resuelve la fricción de desarrollo.
+
+### `GET /api/admin/dashboard/stats`
+
+Endpoint de métricas agregadas para la pantalla principal del panel ADMIN, con 3 queries en
+`Promise.all` (totales, conteo por estado, cancelaciones pendientes) en vez de que el frontend
+combine varias llamadas existentes (`GET /appointments` paginado, `GET /doctors`, etc.) para
+armar el mismo dashboard.
+
+## Extensión post-entrega: género en doctores y dashboard de STATS
+
+Después del rol `DOCTOR` y las notificaciones (ver arriba), se pidieron dos extensiones que
+cambian el contrato de la API:
+
+### Género como dato de dominio (`doctors.gender`)
+
+- Se agregó la columna `gender` (`male`/`female`, NOT NULL) a `doctors` (migración
+  `add-gender-to-doctors`) y al `CreateDoctorDto` (`gender` obligatorio al crear; editable vía
+  `UpdateDoctorDto`). La decisión de diseño: el **prefijo "Dr./Dra." no se almacena** en
+  `doctors.name` — es presentación pura y el frontend lo antepone según `gender` (helper
+  `formatDoctorName` en el frontend). Los DTOs rechazan con `400` cualquier `name` que incluya
+  el prefijo, para que el nombre real nunca quede duplicado ni mezclado.
+- Al crear o editar un doctor, `users.name` se sincroniza con `doctors.name` **en la misma
+  transacción** (`PostgresDoctorRepository.createDoctorAccount`/`update`). Antes quedaba `''`,
+  así que el doctor veía su email donde debería ir su nombre al loguear. El seed se actualizó
+  para generar los doctores con `gender` (y copiar las fotos locales a `/uploads`).
+
+### Endpoint de métricas para el dashboard del ADMIN
+
+`GET /api/admin/dashboard/stats` (`GetDashboardStats`, un caso de uso con 3 queries en
+paralelo sobre `AppointmentsRepository`) devuelve en una sola llamada: `citasPorEstado`
+(conteo por `status`), `citasHoy`, `proximasCitas`, `totalCitas`, `totalPacientes`,
+`totalDoctoresActivos`, `totalDoctoresInactivos` y `cancelacionesPendientes`. Se eligió un
+endpoint dedicado (en vez de obligar al frontend a combinar `GET /appointments` +
+`GET /doctors` + `GET /cancellation-requests`) para que el dashboard sea una sola query, tanto
+de datos como de red. Vive bajo `/api/admin`, protegido con `requireRole('ADMIN')`.
+
 ## Prompts clave
 
 El desarrollo completo se hizo en una sola sesión continua a partir de un único prompt del usuario:

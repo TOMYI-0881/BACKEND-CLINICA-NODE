@@ -86,8 +86,9 @@ describe('DOCTOR solo puede operar su propia cola (requireAdminOrOwnDoctor)', ()
     return Doctor.create({
       id,
       userId,
-      name: 'Dr. Test',
+      name: 'Test',
       specialty: 'Test',
+      gender: 'male',
       isActive: true,
       createdAt: new Date(),
       photoUrl: null,
@@ -164,6 +165,29 @@ describe('POST /appointments/:id/request-cancellation es exclusivo del rol DOCTO
       .post('/api/appointments/apt-1/request-cancellation')
       .set('Authorization', bearerFor({ userId: 'user-doc-1', role: 'DOCTOR' }))
       .send({ reason: 'Emergencia' });
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('GET /api/admin/dashboard/stats es exclusivo del rol ADMIN', () => {
+  const app = createApp(buildFakeContainer({ tokens: fakeTokens }));
+
+  it('sin JWT responde 401', async () => {
+    const res = await request(app).get('/api/admin/dashboard/stats');
+    expect(res.status).toBe(401);
+  });
+
+  it('con rol PATIENT responde 403', async () => {
+    const res = await request(app)
+      .get('/api/admin/dashboard/stats')
+      .set('Authorization', bearerFor({ userId: 'p1', role: 'PATIENT' }));
+    expect(res.status).toBe(403);
+  });
+
+  it('con rol ADMIN es autorizado (llega al controlador)', async () => {
+    const res = await request(app)
+      .get('/api/admin/dashboard/stats')
+      .set('Authorization', bearerFor({ userId: 'a1', role: 'ADMIN' }));
     expect(res.status).toBe(200);
   });
 });

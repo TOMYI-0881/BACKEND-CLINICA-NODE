@@ -2,45 +2,56 @@
 
 Datos leídos directamente de la tabla `users` (y `doctors` para el detalle de especialidad)
 de la base `clinica` corriendo en el contenedor `backend-clinica-node-postgres-1`.
-Regenerado el 2026-09-06 (tras corregir `DATABASE_URL` en `.env`, que apuntaba al puerto 5432 en
-vez de 5434, y re-crear tablas/datos porque la base había quedado sin tablas).
+Regenerado el 2026-09-07, tras hacer que `npm run seed` cree la cuenta ADMIN por defecto (antes
+había que insertarla a mano cada vez que se recreaba el entorno — ver sección ADMIN).
 
 > Las contraseñas están hasheadas con bcrypt en la base — no son recuperables. Se indica la
-> contraseña conocida solo donde el origen del dato la revela (el seed de doctores).
+> contraseña conocida solo donde el origen del dato la revela (el seed).
 
 > **Importante**: `npm run test:integration` y `npm run test:e2e` truncan `users`, `doctors`,
 > `appointments`, `turns` y `appointment_cancellation_requests` en esta misma base de dev
-> (`truncateAll`, corre en el `beforeEach` de cada test). Cada vez que se corren, hay que
-> `npm run seed` para reponer los doctores demo, y recrear el admin a mano (no lo repone el
-> seed). Este archivo puede quedar desactualizado apenas se vuelvan a correr esas suites.
+> (`truncateAll`, corre en el `beforeEach` de cada test). Cada vez que se corren, alcanza con
+> `npm run seed` para reponer TANTO los doctores demo COMO el admin (ya no hace falta recrearlo
+> a mano). Este archivo puede quedar desactualizado apenas se vuelvan a correr esas suites.
 
 ## ADMIN
 
-No hay endpoint público para crear cuentas ADMIN (ver `AI-CONTEXT.md` / `FRONTEND_AGENT_GUIDE.md`);
-esta se insertó manualmente en la base.
+Ya no requiere inserción manual: `npm run seed` (`scripts/seed.ts`, función `ensureAdmin`) crea
+`admin@clinica.test` automáticamente si no existe, igual de idempotente que los doctores. No hay
+endpoint público para crear cuentas ADMIN (ver `AI-CONTEXT.md` / `FRONTEND_AGENT_GUIDE.md`), pero
+ahora el seed cubre ese hueco por defecto en cualquier entorno nuevo (`docker compose up` +
+`npm run migrate:up` + `npm run seed`).
 
 | email              | user_id                              | contraseña |
 | ------------------ | ------------------------------------ | ---------- |
-| admin@clinica.test | 64f32e9b-55c6-4f03-8766-9db4d538ff31 | `admin123` |
+| admin@clinica.test | 28f41743-6c50-4df9-8759-2b7b599ff941 | `admin123` |
 
 ## DOCTOR
 
 Creados por `npm run seed` (`scripts/seed.ts`). Todos comparten la misma contraseña de seed:
-**`clinica123`**.
+**`clinica123`**. El nombre ya NO incluye el prefijo "Dr./Dra." (se agregó el campo `gender` —
+ver migración `add-gender-to-doctors`; el frontend antepone el prefijo según género al mostrar).
 
-| nombre             | especialidad   | email                       | doctor_id                            | user_id                              | activo |
-| ------------------ | -------------- | --------------------------- | ------------------------------------ | ------------------------------------ | ------ |
-| Dra. Ana Fernandez | Cardiologia    | ana.fernandez@clinica.test  | c235a7b8-343b-483a-a111-5ac1f352431b | 71decf94-9e3e-4e8a-b1a9-bfdc7bc8a22c | sí     |
-| Dr. Bruno Gimenez  | Pediatria      | bruno.gimenez@clinica.test  | 1226037a-c592-4ddd-a8d3-be64237ae49d | c579580c-4272-4f5c-9e2d-8d7019cb0993 | sí     |
-| Dra. Carla Lopez   | Dermatologia   | carla.lopez@clinica.test    | b0fb359f-654c-4021-ac8b-342db788821f | 63899684-3280-4807-9376-d0922b0e656f | sí     |
-| Dr. Diego Martinez | Traumatologia  | diego.martinez@clinica.test | 42156146-e209-46f8-b51e-7821192178b5 | 63af1bf4-d216-4d8d-a51e-ebc04e378e1b | sí     |
-| Dra. Elena Suarez  | Clinica Medica | elena.suarez@clinica.test   | 8eae9f44-25f8-4571-a2d3-9d5b24afde77 | 162ca7ae-54c3-4406-b37d-ebf6bbf59e00 | sí     |
+| nombre         | especialidad   | genero | email                        | doctor_id                            | user_id                              | activo |
+| -------------- | -------------- | ------ | ---------------------------- | ------------------------------------ | ------------------------------------- | ------ |
+| Ana Fernandez  | Cardiologia    | female | ana.fernandez@clinica.test   | 1381616a-f645-47e7-b058-cf6d93b1bb67 | e988c11c-f13c-4e50-8bc6-970a0d2a0254  | sí     |
+| Bruno Gimenez  | Pediatria      | male   | bruno.gimenez@clinica.test   | 2f041c0e-4c4e-43da-85db-883e89b67519 | a87f1905-c7cb-4160-bc97-fab0d16ba62d  | sí     |
+| Carla Lopez    | Dermatologia   | female | carla.lopez@clinica.test     | 020634f9-6947-4986-a5cd-6ec097936a6b | c7265580-e284-4986-b2f4-0e4866d29259  | sí     |
+| Diego Martinez | Traumatologia  | male   | diego.martinez@clinica.test  | 0906395b-7f10-4f74-af73-d7221b1b7bf7 | 0784a35a-ce38-4134-b8d0-bb4a92863bbb  | sí     |
+| Elena Suarez   | Clinica Medica | female | elena.suarez@clinica.test    | 25e886ab-d17a-4736-bcf7-a99afefcb3cd | c23bdd18-4bb5-4286-87e8-56a229408d13  | sí     |
+
+Además de estos 5, pueden existir otras cuentas `DOCTOR` creadas manualmente vía
+`POST /api/doctors` (fuera del seed) — por ejemplo, al momento de este snapshot había una
+cuenta adicional (`gthomasenrique0881@gmail.com`, especialidad "CRACK") creada probando el
+flujo real de creación de doctores. Estas no se pierden con `npm run seed` (que solo crea/
+verifica los 5 de arriba por nombre), pero sí con `truncateAll` de los tests.
 
 ## PATIENT
 
-Ninguno cargado actualmente (los últimos quedaron borrados por `truncateAll` de los tests).
-Se crean vía `POST /api/auth/register` (registro público, requiere `email`, `password` y,
-desde el 2026-09-06, `name`).
+Se crean vía `POST /api/auth/register` (registro público, requiere `email`, `password` y
+`name`). Al momento de este snapshot había 2 cargados (creados probando el flujo real, no por
+el seed): `gthomasenrique0882@gmaill.com` y `pepe@gamil.com`. Se pierden con `truncateAll` de
+los tests igual que cualquier otra cuenta.
 
 ## Cómo regenerar este listado
 
@@ -49,6 +60,6 @@ docker exec backend-clinica-node-postgres-1 psql -U user -d clinica -c \
   "SELECT id, email, role, name, created_at FROM users ORDER BY role, created_at;"
 
 docker exec backend-clinica-node-postgres-1 psql -U user -d clinica -c \
-  "SELECT d.id AS doctor_id, d.name, d.specialty, d.is_active, u.email, u.id AS user_id \
+  "SELECT d.id AS doctor_id, d.name, d.specialty, d.gender, d.is_active, u.email, u.id AS user_id \
    FROM doctors d JOIN users u ON u.id = d.user_id ORDER BY d.name;"
 ```

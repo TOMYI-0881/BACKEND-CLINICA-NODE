@@ -9,6 +9,7 @@ function buildDoctor(photoUrl: string | null): Doctor {
     userId: 'user-doc-1',
     name: 'Dr. Test',
     specialty: 'Cardiologia',
+    gender: 'male',
     isActive: true,
     createdAt: new Date(),
     photoUrl,

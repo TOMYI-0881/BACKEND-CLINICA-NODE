@@ -32,9 +32,9 @@ Sistema de reservas de turnos médicos con dos flujos independientes:
   contraseña), ve todas las reservas, aprueba/rechaza pedidos de cancelación de los DOCTOR, y
   puede operar la cola de **cualquier** doctor.
 
-No hay endpoint público para crear cuentas `ADMIN` — la primera se inserta a mano en la base.
-Las cuentas `DOCTOR`, en cambio, sí se crean vía API (`POST /api/doctors`), porque nacen junto
-con el perfil de doctor.
+No hay endpoint público para crear cuentas `ADMIN` (queda cubierta por `npm run seed` en
+entornos de desarrollo — ver sección 9). Las cuentas `DOCTOR`, en cambio, sí se crean vía API
+(`POST /api/doctors`), porque nacen junto con el perfil de doctor.
 
 ---
 
@@ -88,9 +88,10 @@ no lo inventes, avisá si hace falta.
 ### Cómo saber qué puede hacer el usuario logueado
 
 El JWT decodificado (o la respuesta de login) trae `{ userId, role }`. Guardá el objeto
-`user` completo (`{ id, email, role, createdAt }`) que devuelve `POST /api/auth/login` para
-render condicional en la UI (mostrar/ocultar botones según `PATIENT`/`DOCTOR`/`ADMIN`) — no
-confíes solo en esto para seguridad, el backend igual valida el rol en cada request.
+`user` completo (shape `User` de la sección 4: `{ id, email, role, createdAt, photoUrl, name }`)
+que devuelve `POST /api/auth/login` para render condicional en la UI (mostrar/ocultar botones
+según `PATIENT`/`DOCTOR`/`ADMIN`) — no confíes solo en esto para seguridad, el backend igual
+valida el rol en cada request.
 
 **Para un `DOCTOR`**: el `user.id` del login es el `userId` de su cuenta, **no** el `id` de
 su perfil de doctor (`Doctor.id`, el que usan las rutas `/queues/:doctorId/*`). Si tu UI
@@ -119,15 +120,18 @@ interface User {
   role: UserRole;
   createdAt: string; // ISO 8601 UTC
   photoUrl: string | null; // URL publica (/uploads/photos/...) o null si no subio foto
-  name: string;       // '' en cuentas DOCTOR/ADMIN (no pasan por /auth/register)
+  name: string;       // nombre real; sincronizado con Doctor.name para cuentas DOCTOR
   // passwordHash NUNCA se devuelve
 }
+
+type DoctorGender = 'male' | 'female';
 
 interface Doctor {
   id: string;         // usado en las rutas /appointments (doctorId) y /queues/:doctorId
   userId: string;      // id de la cuenta de usuario vinculada (rol DOCTOR)
-  name: string;
+  name: string;        // nombre real, SIN prefijo "Dr./Dra." -- anteponelo vos segun gender
   specialty: string;
+  gender: DoctorGender;
   isActive: boolean;   // false = "borrado" (soft-delete), ya no aparece en GET /doctors
   createdAt: string;
   photoUrl: string | null; // se puebla cuando el doctor sube su foto via POST /auth/me/photo
@@ -135,7 +139,8 @@ interface Doctor {
 
 // CANCELLATION_REQUESTED: un DOCTOR pidio cancelar, pendiente de que ADMIN apruebe/rechace.
 // El horario SIGUE bloqueado en este estado -- no se libera hasta que se aprueba.
-type AppointmentStatus = 'CONFIRMED' | 'CANCELLATION_REQUESTED' | 'CANCELLED';
+// COMPLETED: el paciente ya fue atendido (se marca sola, nunca la setea un endpoint).
+type AppointmentStatus = 'CONFIRMED' | 'CANCELLATION_REQUESTED' | 'CANCELLED' | 'COMPLETED';
 
 interface Appointment {
   id: string;
@@ -180,6 +185,7 @@ interface Turn {
   status: TurnStatus;
   createdAt: string;
   finishedAt: string | null;
+  photoUrl: string | null; // foto del paciente de la cita vinculada; null en walk-ins o sin foto
 }
 ```
 
@@ -202,7 +208,7 @@ Mapeo de status a causa:
 | 401 | No autenticado |
 | 403 | Autenticado pero rol insuficiente, o acción sobre un recurso ajeno (cita de otro doctor, cola de otro doctor, cita de otro paciente) |
 | 404 | Recurso no encontrado |
-| 409 | Conflicto (doble reserva, doble check-in de la misma cita, doble pedido de cancelación pendiente, email ya registrado) |
+| 409 | Conflicto: doble reserva (superposición de horario), **una cita por médico por día** (ver sección 7), doble check-in de la misma cita, doble pedido de cancelación pendiente, o email ya registrado |
 | 429 | Rate limit |
 | 500 | Error interno — no expone detalles, solo `{ "error": "Error interno del servidor" }` |
 
@@ -228,9 +234,9 @@ Mapeo de status a causa:
 
 | Método | Ruta | Auth | Notas |
 |---|---|---|---|
-| GET | `/api/doctors` | No | Lista doctores **activos**, sin paginar. Usalo para poblar selects/listados. |
-| POST | `/api/doctors` | ADMIN | `{ name, specialty, email, password }` → `201`. Crea la cuenta DOCTOR **y** el perfil juntos — el doctor se loguea después con ese email/password. `409` si el email ya existe. |
-| PATCH | `/api/doctors/:id` | ADMIN | `{ name?, specialty? }` (al menos uno). Solo edita el perfil, no la cuenta/email. |
+| GET | `/api/doctors` | No | Lista doctores **activos**, sin paginar. `name` viene SIN el prefijo "Dr./Dra." — anteponelo vos en la UI según `gender` (`male`→"Dr.", `female`→"Dra."). Usalo para poblar selects/listados. |
+| POST | `/api/doctors` | ADMIN | `{ name, specialty, email, password, gender }` → `201`. `gender` es `"male"` o `"female"`, obligatorio. `name` **no debe incluir** el prefijo "Dr./Dra." — el backend lo rechaza con `400` si lo mandás (ver nota arriba, el prefijo es solo de presentación). Crea la cuenta DOCTOR **y** el perfil juntos, con `users.name` ya sincronizado — el doctor se loguea después con ese email/password y ve su nombre real, no el email. `409` si el email ya existe. |
+| PATCH | `/api/doctors/:id` | ADMIN | `{ name?, specialty?, gender? }` (al menos uno). Mismo rechazo de prefijo en `name` que en create. Si cambia `name`, se re-sincroniza `users.name`. |
 | DELETE | `/api/doctors/:id` | ADMIN | Soft-delete: `isActive` pasa a `false`, deja de listarse, y **cancela en cascada** las citas futuras confirmadas de ese doctor (notificando a cada paciente por email). Confirmá con el usuario antes de llamarlo — es una acción con efectos en cascada. |
 | POST | `/api/doctors/:id/reset-password` | ADMIN | Genera una contraseña nueva y se la manda por email al doctor. No devuelve la contraseña en la respuesta — no la muestres ni la pidas de vuelta. |
 
@@ -268,6 +274,12 @@ intentar operar la de otro).
 | POST | `/api/queues/:doctorId/next` | ADMIN o DOCTOR (dueño) | Cierra el turno actual (`done`) y promueve el siguiente (prioridad primero). Botón "Siguiente". |
 | POST | `/api/queues/:doctorId/skip` | ADMIN o DOCTOR (dueño) | Igual que `next` pero marca `skipped`. Botón "Saltar". |
 | POST | `/api/queues/:doctorId/call` | ADMIN o DOCTOR (dueño) | Re-anuncia el turno actual sin cambiar estado (dispara el WebSocket de nuevo). Botón "Re-llamar". `404` si no hay nadie en curso. |
+
+### Admin (métricas)
+
+| Método | Ruta | Auth | Notas |
+|---|---|---|---|
+| GET | `/api/admin/dashboard/stats` | ADMIN | Una sola llamada con métricas agregadas: `citasPorEstado` (conteo por `AppointmentStatus`), `citasHoy`, `proximasCitas`, `totalCitas`, `totalPacientes`, `totalDoctoresActivos`, `totalDoctoresInactivos`, `cancelacionesPendientes`. Pensado para la pantalla principal del panel ADMIN — no hace falta combinar otros endpoints para armar un dashboard. |
 
 ---
 
@@ -327,6 +339,14 @@ tiempo real.
 - **Citas consecutivas son válidas**: un slot `10:00–10:30` y otro `10:30–11:00` no chocan
   (el rango es `[inicio, fin)`). No hace falta lógica especial en el frontend para esto, la
   disponibilidad ya viene filtrada correctamente.
+- **Una cita por médico por día calendario (UTC)**: un paciente no puede tener dos citas
+  activas con el mismo médico el mismo día, pero sí puede tener citas `CONFIRMED` con el mismo
+  médico en días distintos. El `409` de `POST /appointments` trae un mensaje distinto según el
+  motivo — mostralo tal cual (`error.response.data.error`), no lo reemplaces por un texto
+  genérico: `"Ya tenés una cita con este doctor para ese día. Esperá a ser atendido."` (todavía
+  no atendido) vs. `"Ya fuiste atendido por este doctor hoy. Podés reservar para otro día."`
+  (la cita de ese día ya está `COMPLETED`). Cambiar de horario el mismo día sigue andando:
+  cancelar (`DELETE /appointments/:id`) y reservar de nuevo ese mismo día no choca.
 - **Prioridad de la cola**: los turnos `preferente` siempre se atienden antes que los
   `normal`, sin importar el orden de check-in. El listado `waiting` que devuelve el backend
   ya viene ordenado así — mostralo en ese orden, no lo reordenes en el frontend.
@@ -366,10 +386,9 @@ que el usuario pegue contra el límite, aunque no es obligatorio.
 
 Si el backend corrió `npm run seed`, hay 5 doctores de ejemplo ya cargados, cada uno con su
 propia cuenta `DOCTOR` (`GET /api/doctors` los devuelve, ver el README del backend para las
-credenciales de seed). No hay usuarios `PATIENT` de prueba precargados — registrá uno nuevo
-con `POST /api/auth/register`. Para probar el flujo de `ADMIN` necesitás que alguien inserte
-un usuario con `role = 'ADMIN'` directo en la base (no hay endpoint público para esto, es
-intencional).
+credenciales de seed), y **una cuenta `ADMIN`** (`admin@clinica.test` / `admin123` por
+defecto — el seed la crea si todavía no existe, no hace falta insertarla a mano). No hay
+usuarios `PATIENT` de prueba precargados — registrá uno nuevo con `POST /api/auth/register`.
 
 ---
 
@@ -391,6 +410,9 @@ No es un requisito rígido, pero para no dejar funcionalidad del backend sin exp
 9. **Panel ADMIN — Pedidos de cancelación**: bandeja con aprobar/rechazar
 10. **Panel ADMIN — Todas las reservas**: listado paginado
 11. **Panel ADMIN — Control de cola**: por doctor, ver estado en vivo + botones Siguiente / Saltar / Re-llamar + check-in walk-in manual
+12. **Panel ADMIN — Dashboard**: métricas de `GET /api/admin/dashboard/stats` (citas por
+    estado, citas de hoy, próximas, totales, doctores activos/inactivos, cancelaciones
+    pendientes) — buena pantalla de entrada al panel ADMIN
 
 ---
 

@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { env } from '../../src/config/env';
-import { Doctor } from '../../src/domain/entities/Doctor';
+import { Doctor, DoctorGender } from '../../src/domain/entities/Doctor';
 import { DoctorRepository } from '../../src/domain/ports/DoctorRepository';
 
 export function createTestPool(): Pool {
@@ -22,10 +22,11 @@ let doctorEmailCounter = 0;
  */
 export async function createTestDoctor(
   doctorRepo: DoctorRepository,
-  data: { name: string; specialty: string },
+  data: { name: string; specialty: string; gender?: DoctorGender },
 ): Promise<Doctor> {
   doctorEmailCounter += 1;
   return doctorRepo.createDoctorAccount({
+    gender: 'male',
     ...data,
     email: `doctor-${Date.now()}-${doctorEmailCounter}@test.com`,
     passwordHash: 'test-hash',

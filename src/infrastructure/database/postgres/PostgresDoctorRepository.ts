@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { Doctor } from '../../../domain/entities/Doctor';
+import { Doctor, DoctorGender } from '../../../domain/entities/Doctor';
 import { DoctorRepository, NewDoctorAccountData, UpdateDoctorData } from '../../../domain/ports/DoctorRepository';
 import { ConflictError } from '../../../domain/errors/ConflictError';
 import { NotFoundError } from '../../../domain/errors/NotFoundError';
@@ -10,12 +10,13 @@ interface DoctorRow {
   user_id: string;
   name: string;
   specialty: string;
+  gender: DoctorGender;
   is_active: boolean;
   created_at: Date;
   photo_url: string | null;
 }
 
-const SELECT_COLUMNS = 'id, user_id, name, specialty, is_active, created_at, photo_url';
+const SELECT_COLUMNS = 'id, user_id, name, specialty, gender, is_active, created_at, photo_url';
 
 function toDomain(row: DoctorRow): Doctor {
   return Doctor.create({
@@ -23,6 +24,7 @@ function toDomain(row: DoctorRow): Doctor {
     userId: row.user_id,
     name: row.name,
     specialty: row.specialty,
+    gender: row.gender,
     isActive: row.is_active,
     createdAt: row.created_at,
     photoUrl: row.photo_url,
@@ -42,16 +44,16 @@ export class PostgresDoctorRepository implements DoctorRepository {
       await client.query('BEGIN');
 
       const userResult = await client.query<{ id: string }>(
-        `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, 'DOCTOR') RETURNING id`,
-        [data.email, data.passwordHash],
+        `INSERT INTO users (email, password_hash, role, name) VALUES ($1, $2, 'DOCTOR', $3) RETURNING id`,
+        [data.email, data.passwordHash, data.name],
       );
       const userId = userResult.rows[0]?.id;
       if (!userId) throw new Error('INSERT de usuario no devolvio fila');
 
       const doctorResult = await client.query<DoctorRow>(
-        `INSERT INTO doctors (user_id, name, specialty) VALUES ($1, $2, $3)
+        `INSERT INTO doctors (user_id, name, specialty, gender) VALUES ($1, $2, $3, $4)
          RETURNING ${SELECT_COLUMNS}`,
-        [userId, data.name, data.specialty],
+        [userId, data.name, data.specialty, data.gender],
       );
       const doctorRow = doctorResult.rows[0];
       if (!doctorRow) throw new Error('INSERT de doctor no devolvio fila');
@@ -91,15 +93,30 @@ export class PostgresDoctorRepository implements DoctorRepository {
   }
 
   async update(id: string, data: UpdateDoctorData): Promise<Doctor> {
-    const result = await this.pool.query<DoctorRow>(
-      `UPDATE doctors SET name = COALESCE($2, name), specialty = COALESCE($3, specialty)
-       WHERE id = $1
-       RETURNING ${SELECT_COLUMNS}`,
-      [id, data.name ?? null, data.specialty ?? null],
-    );
-    const row = result.rows[0];
-    if (!row) throw new NotFoundError('Doctor no encontrado');
-    return toDomain(row);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const result = await client.query<DoctorRow>(
+        `UPDATE doctors SET name = COALESCE($2, name), specialty = COALESCE($3, specialty), gender = COALESCE($4, gender)
+         WHERE id = $1
+         RETURNING ${SELECT_COLUMNS}`,
+        [id, data.name ?? null, data.specialty ?? null, data.gender ?? null],
+      );
+      const row = result.rows[0];
+      if (!row) throw new NotFoundError('Doctor no encontrado');
+
+      // Mantiene el header (nombre visible al loguear) sincronizado con el perfil de doctor.
+      await client.query(`UPDATE users SET name = $2 WHERE id = $1`, [row.user_id, row.name]);
+
+      await client.query('COMMIT');
+      return toDomain(row);
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async deactivate(id: string): Promise<Doctor> {

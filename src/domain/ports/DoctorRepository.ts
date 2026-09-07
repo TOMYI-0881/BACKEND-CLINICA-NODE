@@ -1,15 +1,17 @@
-import { Doctor } from '../entities/Doctor';
+import { Doctor, DoctorGender } from '../entities/Doctor';
 
 export interface NewDoctorAccountData {
   name: string;
   specialty: string;
   email: string;
   passwordHash: string;
+  gender: DoctorGender;
 }
 
 export interface UpdateDoctorData {
   name?: string;
   specialty?: string;
+  gender?: DoctorGender;
 }
 
 /**

@@ -1,4 +1,15 @@
-import { Appointment } from '../entities/Appointment';
+import { Appointment, AppointmentStatus } from '../entities/Appointment';
+
+export interface DashboardStats {
+  citasPorEstado: Record<AppointmentStatus, number>;
+  citasHoy: number;
+  proximasCitas: number;
+  totalCitas: number;
+  totalPacientes: number;
+  totalDoctoresActivos: number;
+  totalDoctoresInactivos: number;
+  cancelacionesPendientes: number;
+}
 
 export interface NewAppointmentData {
   doctorId: string;
@@ -38,4 +49,6 @@ export interface AppointmentRepository {
   findFutureConfirmedByDoctor(doctorId: string, from: Date): Promise<Appointment[]>;
   /** @throws NotFoundError si la reserva no existe. */
   cancel(id: string): Promise<Appointment>;
+  /** Metricas agregadas para el dashboard de ADMIN. */
+  getDashboardStats(): Promise<DashboardStats>;
 }

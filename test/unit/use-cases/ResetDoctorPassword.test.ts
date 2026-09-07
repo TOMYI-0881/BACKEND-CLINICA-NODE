@@ -15,6 +15,7 @@ function buildDoctor(): Doctor {
     userId: 'user-doc-1',
     name: 'Dr. Reset',
     specialty: 'Cardiologia',
+    gender: 'male',
     isActive: true,
     createdAt: new Date(),
     photoUrl: null,

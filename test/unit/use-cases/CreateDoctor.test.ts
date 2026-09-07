@@ -15,8 +15,9 @@ describe('CreateDoctor', () => {
     const created = Doctor.create({
       id: 'doc-1',
       userId: 'user-1',
-      name: 'Dra. Ana',
+      name: 'Ana',
       specialty: 'Cardiologia',
+      gender: 'female',
       isActive: true,
       createdAt: new Date(),
       photoUrl: null,
@@ -25,18 +26,20 @@ describe('CreateDoctor', () => {
 
     const useCase = new CreateDoctor(doctors, hasher);
     const result = await useCase.execute({
-      name: 'Dra. Ana',
+      name: 'Ana',
       specialty: 'Cardiologia',
       email: 'ana@test.com',
       password: 'plain123',
+      gender: 'female',
     });
 
     expect(hasher.hash).toHaveBeenCalledWith('plain123');
     expect(doctors.createDoctorAccount).toHaveBeenCalledWith({
-      name: 'Dra. Ana',
+      name: 'Ana',
       specialty: 'Cardiologia',
       email: 'ana@test.com',
       passwordHash: 'hashed-pw',
+      gender: 'female',
     });
     expect(result).toBe(created);
   });
@@ -49,7 +52,13 @@ describe('CreateDoctor', () => {
 
     const useCase = new CreateDoctor(doctors, hasher);
     await expect(
-      useCase.execute({ name: 'Dra. Ana', specialty: 'Cardiologia', email: 'ana@test.com', password: 'plain123' }),
+      useCase.execute({
+        name: 'Ana',
+        specialty: 'Cardiologia',
+        email: 'ana@test.com',
+        password: 'plain123',
+        gender: 'female',
+      }),
     ).rejects.toThrow('email duplicado');
   });
 });

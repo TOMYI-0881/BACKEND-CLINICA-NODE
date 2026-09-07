@@ -53,6 +53,7 @@ import { CallNextTurn } from '../application/use-cases/CallNextTurn';
 import { SkipTurn } from '../application/use-cases/SkipTurn';
 import { RecallCurrentTurn } from '../application/use-cases/RecallCurrentTurn';
 import { GetQueueStatus } from '../application/use-cases/GetQueueStatus';
+import { GetDashboardStats } from '../application/use-cases/GetDashboardStats';
 
 import { createAuthController, AuthController } from '../presentation/http/controllers/auth.controller';
 import { createDoctorsController, DoctorsController } from '../presentation/http/controllers/doctors.controller';
@@ -67,6 +68,7 @@ import {
 } from '../presentation/http/controllers/cancellationRequests.controller';
 import { createWebhooksController, WebhooksController } from '../presentation/http/controllers/webhooks.controller';
 import { createHealthController, HealthController } from '../presentation/http/controllers/health.controller';
+import { createAdminController, AdminController } from '../presentation/http/controllers/admin.controller';
 
 /**
  * Pool de conexiones unico compartido por toda la aplicacion.
@@ -111,6 +113,7 @@ export interface AppContainer {
     cancellationRequests: CancellationRequestsController;
     webhooks: WebhooksController;
     health: HealthController;
+    admin: AdminController;
   };
 }
 
@@ -177,6 +180,7 @@ export function buildContainer(): AppContainer {
   const skipTurn = new SkipTurn(queues, events);
   const recallCurrentTurn = new RecallCurrentTurn(queues, events);
   const getQueueStatus = new GetQueueStatus(queues, appointments);
+  const getDashboardStats = new GetDashboardStats(appointments);
 
   return {
     pgPool,
@@ -224,6 +228,7 @@ export function buildContainer(): AppContainer {
       }),
       webhooks: createWebhooksController({ notifier }),
       health: createHealthController({ pgPool, redis: redisConnection }),
+      admin: createAdminController({ getDashboardStats }),
     },
   };
 }
