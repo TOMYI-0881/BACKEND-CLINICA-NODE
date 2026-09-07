@@ -32,6 +32,14 @@ const envSchema = z.object({
   // (express.static, ver app.ts).
   UPLOAD_DIR: z.string().optional().default('uploads'),
   MAX_PHOTO_SIZE_MB: z.coerce.number().int().positive().optional().default(2),
+  // Object storage de fotos (Cloudflare R2). Vacias = se usa disco local (default de dev,
+  // ver LocalDiskPhotoStorage) -- mismo patron no-op-si-vacio que DISCORD_WEBHOOK_URL/EMAIL_*.
+  // Las 5 deben estar presentes para activar R2 (ver config/di.ts).
+  R2_ACCOUNT_ID: z.string().optional().default(''),
+  R2_ACCESS_KEY_ID: z.string().optional().default(''),
+  R2_SECRET_ACCESS_KEY: z.string().optional().default(''),
+  R2_BUCKET: z.string().optional().default(''),
+  R2_PUBLIC_URL: z.string().optional().default(''),
 });
 
 export type Env = Readonly<{
@@ -52,6 +60,11 @@ export type Env = Readonly<{
   emailPort: number | undefined;
   uploadDir: string;
   maxPhotoSizeMb: number;
+  r2AccountId: string;
+  r2AccessKeyId: string;
+  r2SecretAccessKey: string;
+  r2Bucket: string;
+  r2PublicUrl: string;
 }>;
 
 function loadEnv(): Env {
@@ -84,6 +97,11 @@ function loadEnv(): Env {
     emailPort: data.EMAIL_PORT,
     uploadDir: data.UPLOAD_DIR,
     maxPhotoSizeMb: data.MAX_PHOTO_SIZE_MB,
+    r2AccountId: data.R2_ACCOUNT_ID,
+    r2AccessKeyId: data.R2_ACCESS_KEY_ID,
+    r2SecretAccessKey: data.R2_SECRET_ACCESS_KEY,
+    r2Bucket: data.R2_BUCKET,
+    r2PublicUrl: data.R2_PUBLIC_URL,
   };
 }
 

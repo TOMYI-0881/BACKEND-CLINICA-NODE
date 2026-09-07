@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { Pool } from 'pg';
 import { env } from '../src/config/env';
+import { buildPhotoStorage } from '../src/config/photoStorage';
+import { PhotoStorage } from '../src/domain/ports/PhotoStorage';
 import { PostgresDoctorRepository } from '../src/infrastructure/database/postgres/PostgresDoctorRepository';
 import { PostgresUserRepository } from '../src/infrastructure/database/postgres/PostgresUserRepository';
 import { BcryptAdapter } from '../src/infrastructure/auth/BcryptAdapter';
@@ -16,11 +18,17 @@ const ADMIN_EMAIL = 'admin@clinica.test';
 const ADMIN_PASSWORD = 'admin123';
 const ADMIN_NAME = 'Admin';
 
-// Fotos iniciales en public/image/, nombradas por doctor. Se copian a uploads/photos/ (la
-// misma carpeta que sirve el upload manual, ver upload.middleware.ts) para que photo_url
-// quede resoluble por el mismo /uploads estatico sin importar quien la haya puesto ahi.
+// Fotos iniciales en public/image/, nombradas por doctor. Se suben al mismo PhotoStorage que
+// usa el resto de la app (disco local en dev, R2 en produccion si esta configurado -- ver
+// config/photoStorage.ts) para que photo_url quede resoluble sin importar quien la haya puesto ahi.
 const PHOTOS_SOURCE_DIR = path.resolve(__dirname, '../public/image');
-const PHOTOS_DEST_DIR = path.resolve(process.cwd(), env.uploadDir, 'photos');
+
+const EXT_TO_CONTENT_TYPE: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+};
 
 const DOCTORS = [
   {
@@ -60,14 +68,11 @@ const DOCTORS = [
   },
 ];
 
-/** Copia la foto a uploads/photos/ (si todavia no esta) y devuelve la photo_url servible. */
-function ensurePhotoCopied(photoFile: string): string {
-  fs.mkdirSync(PHOTOS_DEST_DIR, { recursive: true });
-  const dest = path.join(PHOTOS_DEST_DIR, photoFile);
-  if (!fs.existsSync(dest)) {
-    fs.copyFileSync(path.join(PHOTOS_SOURCE_DIR, photoFile), dest);
-  }
-  return `/uploads/photos/${photoFile}`;
+/** Sube la foto de ejemplo al PhotoStorage configurado y devuelve la photo_url servible. */
+async function uploadSeedPhoto(photoStorage: PhotoStorage, photoFile: string): Promise<string> {
+  const buffer = fs.readFileSync(path.join(PHOTOS_SOURCE_DIR, photoFile));
+  const contentType = EXT_TO_CONTENT_TYPE[path.extname(photoFile).toLowerCase()] ?? 'image/jpeg';
+  return photoStorage.upload(buffer, photoFile, contentType);
 }
 
 /** Crea admin@clinica.test si todavia no existe (idempotente, como el resto del seed). */
@@ -89,12 +94,12 @@ async function seed(): Promise<void> {
   const doctorRepo = new PostgresDoctorRepository(pool);
   const userRepo = new PostgresUserRepository(pool);
   const hasher = new BcryptAdapter();
+  const photoStorage = buildPhotoStorage();
 
   try {
     await ensureAdmin(pool, userRepo, hasher);
 
     for (const doctor of DOCTORS) {
-      const photoUrl = ensurePhotoCopied(doctor.photoFile);
       const existing = await pool.query<{ id: string; user_id: string; photo_url: string | null }>(
         'SELECT id, user_id, photo_url FROM doctors WHERE name = $1',
         [doctor.name],
@@ -102,6 +107,7 @@ async function seed(): Promise<void> {
       if (existing.rowCount && existing.rowCount > 0) {
         const row = existing.rows[0]!;
         if (!row.photo_url) {
+          const photoUrl = await uploadSeedPhoto(photoStorage, doctor.photoFile);
           await doctorRepo.updatePhoto(row.id, photoUrl);
           await pool.query('UPDATE users SET photo_url = $2 WHERE id = $1', [row.user_id, photoUrl]);
           // eslint-disable-next-line no-console
@@ -120,6 +126,7 @@ async function seed(): Promise<void> {
         passwordHash,
         gender: doctor.gender,
       });
+      const photoUrl = await uploadSeedPhoto(photoStorage, doctor.photoFile);
       await doctorRepo.updatePhoto(created.id, photoUrl);
       await pool.query('UPDATE users SET photo_url = $2 WHERE id = $1', [created.userId, photoUrl]);
       // eslint-disable-next-line no-console

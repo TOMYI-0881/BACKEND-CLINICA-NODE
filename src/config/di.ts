@@ -13,6 +13,7 @@ import { LockService } from '../domain/ports/LockService';
 import { EventPublisher } from '../domain/ports/EventPublisher';
 import { NotificationService } from '../domain/ports/NotificationService';
 import { EmailService } from '../domain/ports/EmailService';
+import { PhotoStorage } from '../domain/ports/PhotoStorage';
 
 import { PostgresUserRepository } from '../infrastructure/database/postgres/PostgresUserRepository';
 import { PostgresDoctorRepository } from '../infrastructure/database/postgres/PostgresDoctorRepository';
@@ -25,6 +26,7 @@ import { RedisLockService } from '../infrastructure/cache/redis/RedisLockService
 import { RedisPubSubEventPublisher } from '../infrastructure/realtime/ws/RedisPubSubEventPublisher';
 import { DiscordNotificationService } from '../infrastructure/notifications/discord/DiscordNotificationService';
 import { NodemailerEmailService } from '../infrastructure/notifications/email/NodemailerEmailService';
+import { buildPhotoStorage } from './photoStorage';
 
 import { RegisterUser } from '../application/use-cases/RegisterUser';
 import { LoginUser } from '../application/use-cases/LoginUser';
@@ -137,6 +139,7 @@ export function buildContainer(): AppContainer {
     host: env.emailHost || undefined,
     port: env.emailPort,
   });
+  const photoStorage: PhotoStorage = buildPhotoStorage();
 
   const registerUser = new RegisterUser(users, hasher);
   const loginUser = new LoginUser(users, hasher, tokens);
@@ -196,6 +199,7 @@ export function buildContainer(): AppContainer {
         updateMyProfile,
         updateMyPhoto,
         removeMyPhoto,
+        photoStorage,
       }),
       doctors: createDoctorsController({
         createDoctor,
@@ -205,6 +209,7 @@ export function buildContainer(): AppContainer {
         resetDoctorPassword,
         updateDoctorPhoto,
         removeDoctorPhoto,
+        photoStorage,
       }),
       appointments: createAppointmentsController({
         createAppointment,

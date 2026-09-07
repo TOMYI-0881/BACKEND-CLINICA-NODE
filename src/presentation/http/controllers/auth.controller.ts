@@ -9,7 +9,8 @@ import { RegisterUserSchema } from '../../../application/dtos/RegisterUserDto';
 import { LoginUserSchema } from '../../../application/dtos/LoginUserDto';
 import { UpdateMyProfileSchema } from '../../../application/dtos/UpdateMyProfileDto';
 import { ValidationError } from '../../../domain/errors/ValidationError';
-import { deletePhotoFile } from '../middlewares/upload.middleware';
+import { PhotoStorage } from '../../../domain/ports/PhotoStorage';
+import { buildPhotoKey } from '../middlewares/upload.middleware';
 import { asyncHandler } from '../asyncHandler';
 
 export interface AuthControllerDeps {
@@ -19,6 +20,7 @@ export interface AuthControllerDeps {
   updateMyProfile: UpdateMyProfile;
   updateMyPhoto: UpdateMyPhoto;
   removeMyPhoto: RemoveMyPhoto;
+  photoStorage: PhotoStorage;
 }
 
 export interface AuthController {
@@ -56,15 +58,16 @@ export function createAuthController(deps: AuthControllerDeps): AuthController {
 
   const uploadPhoto = asyncHandler(async (req, res) => {
     if (!req.file) throw new ValidationError('La foto es obligatoria');
-    const photoUrl = `/uploads/photos/${req.file.filename}`;
+    const key = buildPhotoKey(req.user!.userId, req.file.mimetype);
+    const photoUrl = await deps.photoStorage.upload(req.file.buffer, key, req.file.mimetype);
     const { user, previousPhotoUrl } = await deps.updateMyPhoto.execute(req.user!.userId, photoUrl);
-    if (previousPhotoUrl && previousPhotoUrl !== photoUrl) deletePhotoFile(previousPhotoUrl);
+    if (previousPhotoUrl && previousPhotoUrl !== photoUrl) void deps.photoStorage.delete(previousPhotoUrl);
     res.status(200).json(user.toJSON());
   });
 
   const removePhoto = asyncHandler(async (req, res) => {
     const { previousPhotoUrl } = await deps.removeMyPhoto.execute(req.user!.userId);
-    deletePhotoFile(previousPhotoUrl);
+    void deps.photoStorage.delete(previousPhotoUrl);
     res.status(200).json({ ok: true });
   });
 

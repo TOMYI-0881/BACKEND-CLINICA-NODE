@@ -9,7 +9,8 @@ import { RemoveDoctorPhoto } from '../../../application/use-cases/RemoveDoctorPh
 import { CreateDoctorSchema } from '../../../application/dtos/CreateDoctorDto';
 import { UpdateDoctorSchema } from '../../../application/dtos/UpdateDoctorDto';
 import { ValidationError } from '../../../domain/errors/ValidationError';
-import { deletePhotoFile } from '../middlewares/upload.middleware';
+import { PhotoStorage } from '../../../domain/ports/PhotoStorage';
+import { buildPhotoKey } from '../middlewares/upload.middleware';
 import { asyncHandler } from '../asyncHandler';
 
 export interface DoctorsControllerDeps {
@@ -20,6 +21,7 @@ export interface DoctorsControllerDeps {
   resetDoctorPassword: ResetDoctorPassword;
   updateDoctorPhoto: UpdateDoctorPhoto;
   removeDoctorPhoto: RemoveDoctorPhoto;
+  photoStorage: PhotoStorage;
 }
 
 export interface DoctorsController {
@@ -62,15 +64,17 @@ export function createDoctorsController(deps: DoctorsControllerDeps): DoctorsCon
 
   const uploadPhoto = asyncHandler(async (req, res) => {
     if (!req.file) throw new ValidationError('La foto es obligatoria');
-    const photoUrl = `/uploads/photos/${req.file.filename}`;
-    const { doctor, previousPhotoUrl } = await deps.updateDoctorPhoto.execute(req.params['id'] as string, photoUrl);
-    if (previousPhotoUrl && previousPhotoUrl !== photoUrl) deletePhotoFile(previousPhotoUrl);
+    const doctorId = req.params['id'] as string;
+    const key = buildPhotoKey(doctorId, req.file.mimetype);
+    const photoUrl = await deps.photoStorage.upload(req.file.buffer, key, req.file.mimetype);
+    const { doctor, previousPhotoUrl } = await deps.updateDoctorPhoto.execute(doctorId, photoUrl);
+    if (previousPhotoUrl && previousPhotoUrl !== photoUrl) void deps.photoStorage.delete(previousPhotoUrl);
     res.status(200).json(doctor.toJSON());
   });
 
   const removePhoto = asyncHandler(async (req, res) => {
     const { previousPhotoUrl } = await deps.removeDoctorPhoto.execute(req.params['id'] as string);
-    deletePhotoFile(previousPhotoUrl);
+    void deps.photoStorage.delete(previousPhotoUrl);
     res.status(200).json({ ok: true });
   });
 
