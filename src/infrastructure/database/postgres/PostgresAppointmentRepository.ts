@@ -68,6 +68,26 @@ export class PostgresAppointmentRepository implements AppointmentRepository {
             [data.patientId, data.doctorId],
           );
 
+          // Pre-chequeo para distinguir el mensaje de error: el indice unico
+          // (idx_one_appointment_per_patient_doctor_day) no dice que fila choco, y solo puede
+          // haber a lo sumo una fila por (patient_id, doctor_id, dia UTC) en estos estados.
+          const conflicting = await client.query<{ status: AppointmentStatus }>(
+            `SELECT status
+             FROM appointments
+             WHERE patient_id = $1 AND doctor_id = $2
+               AND (start_time AT TIME ZONE 'UTC')::date = ($3::timestamptz AT TIME ZONE 'UTC')::date
+               AND status IN ('CONFIRMED', 'CANCELLATION_REQUESTED', 'COMPLETED')
+             LIMIT 1`,
+            [data.patientId, data.doctorId, data.startTime],
+          );
+          const conflictRow = conflicting.rows[0];
+          if (conflictRow) {
+            if (conflictRow.status === 'COMPLETED') {
+              throw new ConflictError('Ya fuiste atendido por este doctor hoy. Podés reservar para otro día.');
+            }
+            throw new ConflictError('Ya tenés una cita con este doctor para ese día. Esperá a ser atendido.');
+          }
+
           const result = await client.query<AppointmentRow>(
             `INSERT INTO appointments (doctor_id, patient_id, start_time, end_time)
              VALUES ($1, $2, $3, $4)

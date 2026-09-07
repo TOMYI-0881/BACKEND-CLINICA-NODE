@@ -50,7 +50,9 @@ describe('Reglas de negocio nuevas sobre el paciente (constraints de Postgres)',
         startTime: new Date('2027-04-01T15:00:00Z'),
         endTime: new Date('2027-04-01T15:30:00Z'),
       }),
-    ).rejects.toThrow(new ConflictError('Ya tenes una cita con este doctor ese mismo dia'));
+    ).rejects.toThrow(
+      new ConflictError('Ya tenés una cita con este doctor para ese día. Esperá a ser atendido.'),
+    );
   });
 
   it('un paciente ya atendido (COMPLETED) no puede reservar de nuevo ese mismo dia con el mismo medico', async () => {
@@ -78,7 +80,9 @@ describe('Reglas de negocio nuevas sobre el paciente (constraints de Postgres)',
         startTime: new Date('2027-04-10T15:00:00Z'),
         endTime: new Date('2027-04-10T15:30:00Z'),
       }),
-    ).rejects.toThrow(new ConflictError('Ya tenes una cita con este doctor ese mismo dia'));
+    ).rejects.toThrow(
+      new ConflictError('Ya fuiste atendido por este doctor hoy. Podés reservar para otro día.'),
+    );
   });
 
   it('un paciente atendido puede reservar al dia siguiente con el mismo medico', async () => {
