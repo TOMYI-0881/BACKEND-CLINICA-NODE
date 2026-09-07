@@ -120,6 +120,70 @@ npm run test:e2e      # flujo HTTP completo + tests de carga (20-50 requests con
 `turns`, `appointments`, `doctors`, `users`) antes de cada test — no los corras contra una
 base con datos que te importe conservar.
 
+### Cómo probar la garantía de no-doble-reserva
+
+**Automatizado** (esto es lo que corre `npm run test:integration`):
+`test/integration/appointment-concurrency.test.ts` lanza 8-20 requests `POST /appointments`
+verdaderamente simultáneas (`Promise.allSettled`, sin await entre ellas) al **mismo horario
+con el mismo doctor** desde pacientes distintos, contra Postgres real (no mocks) — y verifica
+que exactamente una resuelve `201` y el resto `409`. Se repite variando el escenario: mismo
+horario exacto, horarios que se superponen parcialmente, y horarios consecutivos que **no**
+deben chocar (`10:00-11:00` y `11:00-12:00`, semántica `[inicio, fin)`). El mismo principio
+está probado también para la cola de espera en vivo (`test/integration/queue-concurrency.test.ts`:
+doble check-in de la misma cita, y nunca más de un turno `in-progress` por doctor).
+
+**A mano**, con la API arriba (`docker compose up` o `npm run dev`), para verlo en vivo con
+tus propios ojos en vez de leer el resultado de un test:
+
+```bash
+#!/usr/bin/env bash
+# 4 pacientes distintos intentan reservar EL MISMO horario con el mismo doctor,
+# al mismo tiempo. Se espera exactamente un 201 y el resto 409.
+BASE=http://localhost:3001
+DOCTOR_ID=$(curl -s $BASE/api/doctors | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d)[0].id))")
+START="2027-01-01T10:00:00.000Z"
+END="2027-01-01T10:30:00.000Z"
+
+for i in $(seq 1 4); do
+  EMAIL="carrera-$i-$RANDOM@test.com"
+  curl -s -X POST $BASE/api/auth/register -H "Content-Type: application/json" \
+    -d "{\"email\":\"$EMAIL\",\"password\":\"test1234\",\"name\":\"Carrera $i\"}" > /dev/null
+  TOKEN=$(curl -s -X POST $BASE/api/auth/login -H "Content-Type: application/json" \
+    -d "{\"email\":\"$EMAIL\",\"password\":\"test1234\"}" \
+    | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).token))")
+  ( curl -s -o /dev/null -w "Paciente $i -> %{http_code}\n" -X POST $BASE/api/appointments \
+      -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+      -d "{\"doctorId\":\"$DOCTOR_ID\",\"startTime\":\"$START\",\"endTime\":\"$END\"}" ) &
+done
+wait
+```
+
+Salida esperada (el orden de las líneas puede variar, el resultado no) — **probado tal cual
+está escrito arriba**, contra una API real:
+
+```
+Paciente 1 -> 201
+Paciente 2 -> 409
+Paciente 3 -> 409
+Paciente 4 -> 409
+```
+
+> El script se queda deliberadamente en 4 pacientes (no más): `POST /auth/login` tiene un rate
+> limit de 5 intentos/minuto por IP (sección 8 de `FRONTEND_AGENT_GUIDE.md`), y cada iteración
+> hace un login. Si ya veniás probando el login manualmente y te quedan pocos intentos en la
+> ventana del minuto, algún `409` esperado puede aparecer como `401` (el login individual de
+> ese paciente fue rate-limiteado, no un fallo de la garantía de concurrencia) — esperá un
+> minuto y volvé a correrlo si eso pasa. El test automatizado no tiene este problema porque
+> crea los pacientes directo en la base, sin pasar por el endpoint de login.
+
+Por qué esto es confiable bajo carga real (no solo "anduvo esta vez"): la garantía es la
+constraint `EXCLUDE USING gist` de Postgres sobre `appointments` (sección 1), no un `if` de
+aplicación con una ventana de carrera. Bajo concurrencia alta, Postgres puede resolver la
+contención como `deadlock_detected` en vez de `exclusion_violation` para algunas de las
+transacciones perdedoras — comportamiento documentado del motor con índices GiST, no un bug;
+está manejado con reintento y backoff exponencial (ver la sección "Deadlocks bajo
+restricciones EXCLUDE" en `AI-CONTEXT.md` para el detalle de por qué y cómo se ajustó).
+
 ## 5. Variables de entorno
 
 Ver `.env.template`. Todas se validan al arranque (`config/env.ts`, con `zod`) — el proceso
