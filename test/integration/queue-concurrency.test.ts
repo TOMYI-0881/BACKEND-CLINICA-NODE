@@ -238,4 +238,135 @@ describe('Concurrencia de la cola de espera contra Postgres real', () => {
       .sort((a, b) => a - b);
     expect(numbers).toEqual(Array.from({ length: CONCURRENT_REQUESTS }, (_, i) => i + 1));
   });
+
+  it('getStatus resuelve photoUrl del paciente via appointment_id -> patient_id, y null en walk-ins', async () => {
+    const doctor = await createTestDoctor(doctorRepo, { name: 'Dr. Fotos', specialty: 'Test' });
+    const patient = await userRepo.save({
+      email: 'foto-cola@test.com',
+      passwordHash: 'hash',
+      role: 'PATIENT',
+      name: 'Paciente Foto',
+    });
+    const photoUrl = '/uploads/photos/foto-cola.jpg';
+    await userRepo.updatePhotoUrl(patient.id, photoUrl);
+    const appointment = await appointmentRepo.save({
+      doctorId: doctor.id,
+      patientId: patient.id,
+      startTime: new Date('2026-02-08T10:00:00Z'),
+      endTime: new Date('2026-02-08T11:00:00Z'),
+    });
+    const queueDate = '2026-02-08';
+
+    const withAppointment = await queueRepo.checkIn({
+      doctorId: doctor.id,
+      queueDate,
+      appointmentId: appointment.id,
+      patientName: 'Paciente Foto',
+      priority: 'normal',
+    });
+    const walkIn = await queueRepo.checkIn({
+      doctorId: doctor.id,
+      queueDate,
+      appointmentId: null,
+      patientName: 'Walk-in Sin Foto',
+      priority: 'normal',
+    });
+
+    const status = await queueRepo.getStatus(doctor.id, queueDate);
+    const waitingWithAppointment = status.waiting.find((t) => t.id === withAppointment.id);
+    const waitingWalkIn = status.waiting.find((t) => t.id === walkIn.id);
+
+    expect(waitingWithAppointment?.photoUrl).toBe(photoUrl);
+    expect(waitingWalkIn?.photoUrl).toBeNull();
+  });
+
+  it('findCurrent y promoteNextWaiting (via callNext) mantienen el photoUrl del paciente', async () => {
+    const doctor = await createTestDoctor(doctorRepo, { name: 'Dr. Fotos Promocion', specialty: 'Test' });
+    const patient = await userRepo.save({
+      email: 'foto-promocion@test.com',
+      passwordHash: 'hash',
+      role: 'PATIENT',
+      name: 'Paciente Promocion',
+    });
+    const photoUrl = '/uploads/photos/foto-promocion.jpg';
+    await userRepo.updatePhotoUrl(patient.id, photoUrl);
+    const appointment = await appointmentRepo.save({
+      doctorId: doctor.id,
+      patientId: patient.id,
+      startTime: new Date('2026-02-09T10:00:00Z'),
+      endTime: new Date('2026-02-09T11:00:00Z'),
+    });
+    const queueDate = '2026-02-09';
+
+    await queueRepo.checkIn({
+      doctorId: doctor.id,
+      queueDate,
+      appointmentId: appointment.id,
+      patientName: 'Paciente Promocion',
+      priority: 'normal',
+    });
+
+    const result = await queueRepo.callNext(doctor.id, queueDate);
+    expect(result.promoted?.photoUrl).toBe(photoUrl);
+
+    const current = await queueRepo.findCurrent(doctor.id, queueDate);
+    expect(current?.photoUrl).toBe(photoUrl);
+  });
+
+  it('callNext marca la cita vinculada como COMPLETED al finalizar el turno; skip no la toca', async () => {
+    const doctor = await createTestDoctor(doctorRepo, { name: 'Dr. Cita Completada', specialty: 'Test' });
+    const patientDone = await userRepo.save({
+      email: 'turno-done@test.com',
+      passwordHash: 'hash',
+      role: 'PATIENT',
+      name: 'Test',
+    });
+    const patientSkipped = await userRepo.save({
+      email: 'turno-skip@test.com',
+      passwordHash: 'hash',
+      role: 'PATIENT',
+      name: 'Test',
+    });
+    const appointmentDone = await appointmentRepo.save({
+      doctorId: doctor.id,
+      patientId: patientDone.id,
+      startTime: new Date('2026-02-10T10:00:00Z'),
+      endTime: new Date('2026-02-10T10:30:00Z'),
+    });
+    const appointmentSkipped = await appointmentRepo.save({
+      doctorId: doctor.id,
+      patientId: patientSkipped.id,
+      startTime: new Date('2026-02-10T11:00:00Z'),
+      endTime: new Date('2026-02-10T11:30:00Z'),
+    });
+    const queueDate = '2026-02-10';
+
+    await queueRepo.checkIn({
+      doctorId: doctor.id,
+      queueDate,
+      appointmentId: appointmentDone.id,
+      patientName: 'Paciente Done',
+      priority: 'normal',
+    });
+    await queueRepo.checkIn({
+      doctorId: doctor.id,
+      queueDate,
+      appointmentId: appointmentSkipped.id,
+      patientName: 'Paciente Skip',
+      priority: 'normal',
+    });
+
+    // Promueve al primero (Done) a in-progress, y lo finaliza como "done".
+    await queueRepo.callNext(doctor.id, queueDate);
+    await queueRepo.callNext(doctor.id, queueDate);
+
+    const doneAppointment = await appointmentRepo.findById(appointmentDone.id);
+    expect(doneAppointment?.status).toBe('COMPLETED');
+
+    // El segundo turno (Skip) quedo in-progress tras el callNext anterior; se salta.
+    await queueRepo.skip(doctor.id, queueDate);
+
+    const skippedAppointment = await appointmentRepo.findById(appointmentSkipped.id);
+    expect(skippedAppointment?.status).toBe('CONFIRMED');
+  });
 });

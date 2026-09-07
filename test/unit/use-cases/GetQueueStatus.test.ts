@@ -27,6 +27,7 @@ function buildTurn(id: string, appointmentId: string | null): Turn {
     status: 'waiting',
     createdAt: new Date(),
     finishedAt: null,
+    photoUrl: null,
   });
 }
 

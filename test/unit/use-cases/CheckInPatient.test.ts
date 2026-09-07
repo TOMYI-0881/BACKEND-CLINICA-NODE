@@ -29,6 +29,7 @@ function buildTurn(): Turn {
     status: 'waiting',
     createdAt: new Date(),
     finishedAt: null,
+    photoUrl: null,
   });
 }
 

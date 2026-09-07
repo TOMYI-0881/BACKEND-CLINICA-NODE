@@ -1,6 +1,6 @@
 import { ValidationError } from '../errors/ValidationError';
 
-export type AppointmentStatus = 'CONFIRMED' | 'CANCELLED' | 'CANCELLATION_REQUESTED';
+export type AppointmentStatus = 'CONFIRMED' | 'CANCELLED' | 'CANCELLATION_REQUESTED' | 'COMPLETED';
 
 export interface AppointmentProps {
   id: string;
@@ -13,7 +13,7 @@ export interface AppointmentProps {
   patientEmail?: string;
 }
 
-const VALID_STATUSES: AppointmentStatus[] = ['CONFIRMED', 'CANCELLED', 'CANCELLATION_REQUESTED'];
+const VALID_STATUSES: AppointmentStatus[] = ['CONFIRMED', 'CANCELLED', 'CANCELLATION_REQUESTED', 'COMPLETED'];
 
 export class Appointment {
   private constructor(private readonly props: AppointmentProps) {}

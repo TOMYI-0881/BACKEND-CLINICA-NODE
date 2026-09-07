@@ -43,23 +43,44 @@ function toDomain(row: AppointmentRow): Appointment {
 const SELECT_COLUMNS =
   'id, doctor_id, patient_id, start_time, end_time, status, created_at';
 
+const ONE_APPOINTMENT_PER_PATIENT_DOCTOR_DAY_INDEX = 'idx_one_appointment_per_patient_doctor_day';
+
 export class PostgresAppointmentRepository implements AppointmentRepository {
   constructor(private readonly pool: Pool) {}
 
   async save(data: NewAppointmentData): Promise<Appointment> {
     return withRetry(
       async () => {
+        const client = await this.pool.connect();
         try {
-          const result = await this.pool.query<AppointmentRow>(
+          await client.query('BEGIN');
+
+          // Higiene de datos: deja COMPLETED una cita vieja que nadie cerro explicitamente via
+          // la cola (ver PostgresQueueRepository.finishCurrentTurn). No hace falta para que el
+          // indice por-dia (idx_one_appointment_per_patient_doctor_day) permita reservar en otro
+          // dia -- ese indice ya distingue por start_time::date sin importar el status.
+          await client.query(
+            `UPDATE appointments
+             SET status = 'COMPLETED'
+             WHERE patient_id = $1 AND doctor_id = $2
+               AND status IN ('CONFIRMED', 'CANCELLATION_REQUESTED')
+               AND start_time < now()`,
+            [data.patientId, data.doctorId],
+          );
+
+          const result = await client.query<AppointmentRow>(
             `INSERT INTO appointments (doctor_id, patient_id, start_time, end_time)
              VALUES ($1, $2, $3, $4)
              RETURNING ${SELECT_COLUMNS}`,
             [data.doctorId, data.patientId, data.startTime, data.endTime],
           );
+
+          await client.query('COMMIT');
           const row = result.rows[0];
           if (!row) throw new Error('INSERT no devolvio fila');
           return toDomain(row);
         } catch (err) {
+          await client.query('ROLLBACK').catch(() => undefined);
           if (pgErrorCode(err) === PG_EXCLUSION_VIOLATION) {
             if (pgErrorConstraint(err) === 'no_overlapping_patient_appointments') {
               throw new ConflictError('Ya tenes otra cita en ese horario con otro medico');
@@ -68,11 +89,13 @@ export class PostgresAppointmentRepository implements AppointmentRepository {
           }
           if (
             pgErrorCode(err) === PG_UNIQUE_VIOLATION &&
-            pgErrorConstraint(err) === 'idx_one_active_appointment_per_patient_doctor'
+            pgErrorConstraint(err) === ONE_APPOINTMENT_PER_PATIENT_DOCTOR_DAY_INDEX
           ) {
-            throw new ConflictError('Ya tenes una cita activa con este medico');
+            throw new ConflictError('Ya tenes una cita con este doctor ese mismo dia');
           }
           throw err;
+        } finally {
+          client.release();
         }
       },
       { retries: 10, isRetryable: isTransientConcurrencyError },

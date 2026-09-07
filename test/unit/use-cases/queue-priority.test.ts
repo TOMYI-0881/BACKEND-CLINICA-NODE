@@ -53,6 +53,7 @@ function makeTurn(id: string, number: number, priority: 'normal' | 'preferente')
     status: 'waiting',
     createdAt: new Date(),
     finishedAt: null,
+    photoUrl: null,
   });
 }
 

@@ -13,6 +13,7 @@ function makeTurn(overrides: Partial<TurnProps>): Turn {
     status: overrides.status ?? 'waiting',
     createdAt: overrides.createdAt ?? new Date('2026-01-01T08:00:00Z'),
     finishedAt: overrides.finishedAt ?? null,
+    photoUrl: overrides.photoUrl ?? null,
   });
 }
 

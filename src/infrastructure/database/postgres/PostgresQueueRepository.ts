@@ -29,6 +29,9 @@ interface TurnRow {
   status: TurnStatus;
   created_at: Date;
   finished_at: Date | null;
+  // Solo presente cuando la query hace el join a appointments/users (ver PATIENT_PHOTO_JOIN);
+  // ausente (no seleccionada) en checkIn/finishCurrentTurn, que quedan con photoUrl null.
+  photo_url?: string | null;
 }
 
 const SELECT_COLUMNS =
@@ -40,7 +43,12 @@ const SELECT_COLUMNS =
 const QUALIFIED_TURN_COLUMNS =
   't.id, t.doctor_id, t.appointment_id, t.queue_date, t.number, t.patient_name, t.priority, t.status, t.created_at, t.finished_at';
 
-function toDomain(row: TurnRow): Turn {
+// Foto del paciente de la cita ligada al turno (null en walk-ins, que no tienen appointment_id).
+const PATIENT_PHOTO_JOIN =
+  'LEFT JOIN appointments a ON a.id = t.appointment_id LEFT JOIN users u ON u.id = a.patient_id';
+const QUALIFIED_TURN_COLUMNS_WITH_PHOTO = `${QUALIFIED_TURN_COLUMNS}, u.photo_url`;
+
+function toDomain(row: TurnRow, photoUrl: string | null = row.photo_url ?? null): Turn {
   return Turn.create({
     id: row.id,
     doctorId: row.doctor_id,
@@ -54,6 +62,7 @@ function toDomain(row: TurnRow): Turn {
     status: row.status,
     createdAt: row.created_at,
     finishedAt: row.finished_at,
+    photoUrl,
   });
 }
 
@@ -121,12 +130,14 @@ export class PostgresQueueRepository implements QueueRepository {
   async getStatus(doctorId: string, queueDate: string): Promise<QueueStatus> {
     const [currentResult, waitingResult] = await Promise.all([
       this.pool.query<TurnRow>(
-        `SELECT ${SELECT_COLUMNS} FROM turns WHERE doctor_id = $1 AND queue_date = $2 AND status = 'in-progress'`,
+        `SELECT ${QUALIFIED_TURN_COLUMNS_WITH_PHOTO} FROM turns t
+         ${PATIENT_PHOTO_JOIN}
+         WHERE t.doctor_id = $1 AND t.queue_date = $2 AND t.status = 'in-progress'`,
         [doctorId, queueDate],
       ),
       this.pool.query<TurnRow>(
-        `SELECT ${QUALIFIED_TURN_COLUMNS} FROM turns t
-         LEFT JOIN appointments a ON a.id = t.appointment_id
+        `SELECT ${QUALIFIED_TURN_COLUMNS_WITH_PHOTO} FROM turns t
+         ${PATIENT_PHOTO_JOIN}
          WHERE t.doctor_id = $1 AND t.queue_date = $2 AND t.status = 'waiting'
            AND (a.id IS NULL OR a.status = 'CONFIRMED')
          ORDER BY (t.priority = 'preferente') DESC, COALESCE(a.created_at, t.created_at) ASC, t.number ASC`,
@@ -137,13 +148,15 @@ export class PostgresQueueRepository implements QueueRepository {
     const currentRow = currentResult.rows[0];
     return {
       current: currentRow ? toDomain(currentRow) : null,
-      waiting: waitingResult.rows.map(toDomain),
+      waiting: waitingResult.rows.map((row) => toDomain(row)),
     };
   }
 
   async findCurrent(doctorId: string, queueDate: string): Promise<Turn | null> {
     const result = await this.pool.query<TurnRow>(
-      `SELECT ${SELECT_COLUMNS} FROM turns WHERE doctor_id = $1 AND queue_date = $2 AND status = 'in-progress'`,
+      `SELECT ${QUALIFIED_TURN_COLUMNS_WITH_PHOTO} FROM turns t
+       ${PATIENT_PHOTO_JOIN}
+       WHERE t.doctor_id = $1 AND t.queue_date = $2 AND t.status = 'in-progress'`,
       [doctorId, queueDate],
     );
     const row = result.rows[0];
@@ -207,6 +220,17 @@ export class PostgresQueueRepository implements QueueRepository {
       `UPDATE turns SET status = $1, finished_at = now() WHERE id = $2 RETURNING ${SELECT_COLUMNS}`,
       [targetStatus, currentRow.id],
     );
+
+    // El turno "done" (atendido) marca su cita como completada para liberar el indice unico
+    // (patient_id, doctor_id) de citas activas -- ver PostgresAppointmentRepository.save().
+    // "skipped" no representa atencion real, la cita sigue CONFIRMED. Acoplamiento SQL minimo
+    // (mismo client/transaccion) en vez de una dependencia nueva al puerto de appointments.
+    if (targetStatus === 'done' && currentRow.appointment_id) {
+      await client.query(`UPDATE appointments SET status = 'COMPLETED' WHERE id = $1 AND status = 'CONFIRMED'`, [
+        currentRow.appointment_id,
+      ]);
+    }
+
     const row = updated.rows[0];
     return row ? toDomain(row) : null;
   }
@@ -217,8 +241,8 @@ export class PostgresQueueRepository implements QueueRepository {
     queueDate: string,
   ): Promise<Turn | null> {
     const nextResult = await client.query<TurnRow>(
-      `SELECT ${QUALIFIED_TURN_COLUMNS} FROM turns t
-       LEFT JOIN appointments a ON a.id = t.appointment_id
+      `SELECT ${QUALIFIED_TURN_COLUMNS_WITH_PHOTO} FROM turns t
+       ${PATIENT_PHOTO_JOIN}
        WHERE t.doctor_id = $1 AND t.queue_date = $2 AND t.status = 'waiting'
          AND (a.id IS NULL OR a.status = 'CONFIRMED')
        ORDER BY (t.priority = 'preferente') DESC, COALESCE(a.created_at, t.created_at) ASC, t.number ASC
@@ -229,11 +253,14 @@ export class PostgresQueueRepository implements QueueRepository {
     const nextRow = nextResult.rows[0];
     if (!nextRow) return null;
 
+    // El UPDATE...RETURNING no puede volver a hacer el join, asi que la foto se toma del
+    // SELECT anterior (nextRow), no de la fila que devuelve este UPDATE.
+    const photoUrl = nextRow.photo_url ?? null;
     const promoted = await client.query<TurnRow>(
       `UPDATE turns SET status = 'in-progress' WHERE id = $1 RETURNING ${SELECT_COLUMNS}`,
       [nextRow.id],
     );
     const row = promoted.rows[0];
-    return row ? toDomain(row) : null;
+    return row ? toDomain(row, photoUrl) : null;
   }
 }

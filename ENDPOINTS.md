@@ -13,36 +13,36 @@ usá la documentación OpenAPI/Swagger servida en **`GET /api-docs`** con la API
 
 ## Índice
 
-| Método | Ruta | Auth | Rol |
-|---|---|---|---|
-| POST | [`/api/auth/register`](#post-apiauthregister) | No | - |
-| POST | [`/api/auth/login`](#post-apiauthlogin) | No | - |
-| GET | [`/api/auth/me`](#get-apiauthme) | JWT | Cualquier rol |
-| POST | [`/api/auth/me/photo`](#post-apiauthmephoto) | JWT | Cualquier rol |
-| DELETE | [`/api/auth/me/photo`](#delete-apiauthmephoto) | JWT | Cualquier rol |
-| GET | [`/api/doctors`](#get-apidoctors) | No | - |
-| POST | [`/api/doctors`](#post-apidoctors) | JWT | ADMIN |
-| PATCH | [`/api/doctors/:id`](#patch-apidoctorsid) | JWT | ADMIN |
-| DELETE | [`/api/doctors/:id`](#delete-apidoctorsid) | JWT | ADMIN |
-| POST | [`/api/doctors/:id/reset-password`](#post-apidoctorsidreset-password) | JWT | ADMIN |
-| GET | [`/api/appointments/availability`](#get-apiappointmentsavailability) | No | - |
-| POST | [`/api/appointments`](#post-apiappointments) | JWT | PATIENT |
-| GET | [`/api/appointments/mine`](#get-apiappointmentsmine) | JWT | PATIENT o DOCTOR |
-| GET | [`/api/appointments`](#get-apiappointments) | JWT | ADMIN |
-| DELETE | [`/api/appointments/:id`](#delete-apiappointmentsid) | JWT | PATIENT (dueño) o ADMIN |
-| POST | [`/api/appointments/:id/request-cancellation`](#post-apiappointmentsidrequest-cancellation) | JWT | DOCTOR (dueño) |
-| GET | [`/api/cancellation-requests`](#get-apicancellation-requests) | JWT | ADMIN |
-| POST | [`/api/cancellation-requests/:id/approve`](#post-apicancellation-requestsidapprove) | JWT | ADMIN |
-| POST | [`/api/cancellation-requests/:id/reject`](#post-apicancellation-requestsidreject) | JWT | ADMIN |
-| POST | [`/api/queues/:doctorId/check-in`](#post-apiqueuesdoctoridcheck-in) | JWT | PATIENT, ADMIN o DOCTOR (dueño) |
-| GET | [`/api/queues/:doctorId`](#get-apiqueuesdoctorid) | No | - |
-| POST | [`/api/queues/:doctorId/next`](#post-apiqueuesdoctoridnext) | JWT | ADMIN o DOCTOR (dueño) |
-| POST | [`/api/queues/:doctorId/skip`](#post-apiqueuesdoctoridskip) | JWT | ADMIN o DOCTOR (dueño) |
-| POST | [`/api/queues/:doctorId/call`](#post-apiqueuesdoctoridcall) | JWT | ADMIN o DOCTOR (dueño) |
-| POST | [`/api/webhooks/github`](#post-apiwebhooksgithub) | Firma HMAC | - |
-| GET | [`/health`](#get-health) | No | - |
-| GET | [`/api-docs`](#get-api-docs) | No | - |
-| WS | [`/ws`](#websocket-ws) | No | - |
+| Método | Ruta                                                                                        | Auth       | Rol                             |
+| ------ | ------------------------------------------------------------------------------------------- | ---------- | ------------------------------- |
+| POST   | [`/api/auth/register`](#post-apiauthregister)                                               | No         | -                               |
+| POST   | [`/api/auth/login`](#post-apiauthlogin)                                                     | No         | -                               |
+| GET    | [`/api/auth/me`](#get-apiauthme)                                                            | JWT        | Cualquier rol                   |
+| POST   | [`/api/auth/me/photo`](#post-apiauthmephoto)                                                | JWT        | Cualquier rol                   |
+| DELETE | [`/api/auth/me/photo`](#delete-apiauthmephoto)                                              | JWT        | Cualquier rol                   |
+| GET    | [`/api/doctors`](#get-apidoctors)                                                           | No         | -                               |
+| POST   | [`/api/doctors`](#post-apidoctors)                                                          | JWT        | ADMIN                           |
+| PATCH  | [`/api/doctors/:id`](#patch-apidoctorsid)                                                   | JWT        | ADMIN                           |
+| DELETE | [`/api/doctors/:id`](#delete-apidoctorsid)                                                  | JWT        | ADMIN                           |
+| POST   | [`/api/doctors/:id/reset-password`](#post-apidoctorsidreset-password)                       | JWT        | ADMIN                           |
+| GET    | [`/api/appointments/availability`](#get-apiappointmentsavailability)                        | No         | -                               |
+| POST   | [`/api/appointments`](#post-apiappointments)                                                | JWT        | PATIENT                         |
+| GET    | [`/api/appointments/mine`](#get-apiappointmentsmine)                                        | JWT        | PATIENT o DOCTOR                |
+| GET    | [`/api/appointments`](#get-apiappointments)                                                 | JWT        | ADMIN                           |
+| DELETE | [`/api/appointments/:id`](#delete-apiappointmentsid)                                        | JWT        | PATIENT (dueño) o ADMIN         |
+| POST   | [`/api/appointments/:id/request-cancellation`](#post-apiappointmentsidrequest-cancellation) | JWT        | DOCTOR (dueño)                  |
+| GET    | [`/api/cancellation-requests`](#get-apicancellation-requests)                               | JWT        | ADMIN                           |
+| POST   | [`/api/cancellation-requests/:id/approve`](#post-apicancellation-requestsidapprove)         | JWT        | ADMIN                           |
+| POST   | [`/api/cancellation-requests/:id/reject`](#post-apicancellation-requestsidreject)           | JWT        | ADMIN                           |
+| POST   | [`/api/queues/:doctorId/check-in`](#post-apiqueuesdoctoridcheck-in)                         | JWT        | PATIENT, ADMIN o DOCTOR (dueño) |
+| GET    | [`/api/queues/:doctorId`](#get-apiqueuesdoctorid)                                           | No         | -                               |
+| POST   | [`/api/queues/:doctorId/next`](#post-apiqueuesdoctoridnext)                                 | JWT        | ADMIN o DOCTOR (dueño)          |
+| POST   | [`/api/queues/:doctorId/skip`](#post-apiqueuesdoctoridskip)                                 | JWT        | ADMIN o DOCTOR (dueño)          |
+| POST   | [`/api/queues/:doctorId/call`](#post-apiqueuesdoctoridcall)                                 | JWT        | ADMIN o DOCTOR (dueño)          |
+| POST   | [`/api/webhooks/github`](#post-apiwebhooksgithub)                                           | Firma HMAC | -                               |
+| GET    | [`/health`](#get-health)                                                                    | No         | -                               |
+| GET    | [`/api-docs`](#get-api-docs)                                                                | No         | -                               |
+| WS     | [`/ws`](#websocket-ws)                                                                      | No         | -                               |
 
 ---
 
@@ -55,24 +55,34 @@ Registra un usuario nuevo. Siempre se crea con rol `PATIENT`.
 **Rate limit**: sin límite estricto propio (solo el global de `/api`, 100 req/min).
 
 **Body**
+
 ```json
 { "email": "paciente@test.com", "password": "secret123", "name": "Juan Perez" }
 ```
+
 - `email`: string, formato email
 - `password`: string, mínimo 6 caracteres
 - `name`: string, entre 2 y 120 caracteres (se usa como nombre visible, ej. en la lista de
   espera de la cola en vivo)
 
 **Respuestas**
-| Status | Cuándo |
-|---|---|
-| 201 | Usuario creado. Devuelve el usuario (sin `passwordHash`) |
-| 400 | Datos inválidos (zod) |
-| 409 | El email ya está registrado |
+
+| Status | Cuándo                                                   |
+| ------ | -------------------------------------------------------- |
+| 201    | Usuario creado. Devuelve el usuario (sin `passwordHash`) |
+| 400    | Datos inválidos (zod)                                    |
+| 409    | El email ya está registrado                              |
 
 ```json
 // 201
-{ "id": "uuid", "email": "paciente@test.com", "role": "PATIENT", "createdAt": "2026-...", "photoUrl": null, "name": "Juan Perez" }
+{
+  "id": "uuid",
+  "email": "paciente@test.com",
+  "role": "PATIENT",
+  "createdAt": "2026-...",
+  "photoUrl": null,
+  "name": "Juan Perez"
+}
 ```
 
 ### `POST /api/auth/login`
@@ -82,22 +92,31 @@ Autentica y devuelve un JWT.
 **Rate limit**: **5 intentos/minuto por IP** (`loginRateLimiter`) — supera esto y responde 429.
 
 **Body**
+
 ```json
 { "email": "paciente@test.com", "password": "secret123" }
 ```
 
 **Respuestas**
-| Status | Cuándo |
-|---|---|
-| 200 | Login exitoso |
-| 401 | Credenciales inválidas |
-| 429 | Demasiados intentos |
+
+| Status | Cuándo                 |
+| ------ | ---------------------- |
+| 200    | Login exitoso          |
+| 401    | Credenciales inválidas |
+| 429    | Demasiados intentos    |
 
 ```json
 // 200
 {
   "token": "eyJhbGciOi...",
-  "user": { "id": "uuid", "email": "paciente@test.com", "role": "PATIENT", "createdAt": "2026-...", "photoUrl": null, "name": "Juan Perez" }
+  "user": {
+    "id": "uuid",
+    "email": "paciente@test.com",
+    "role": "PATIENT",
+    "createdAt": "2026-...",
+    "photoUrl": null,
+    "name": "Juan Perez"
+  }
 }
 ```
 
@@ -110,7 +129,14 @@ Sirve para los 3 roles.
 
 ```json
 // 200
-{ "id": "uuid", "email": "paciente@test.com", "role": "PATIENT", "createdAt": "2026-...", "photoUrl": "/uploads/photos/<archivo>.jpg", "name": "Juan Perez" }
+{
+  "id": "uuid",
+  "email": "paciente@test.com",
+  "role": "PATIENT",
+  "createdAt": "2026-...",
+  "photoUrl": "/uploads/photos/<archivo>.jpg",
+  "name": "Juan Perez"
+}
 ```
 
 ### `POST /api/auth/me/photo`
@@ -121,19 +147,28 @@ usuario es rol `DOCTOR`, la foto se replica automáticamente en su perfil públi
 también en `GET /api/doctors`). Sirve para los 3 roles.
 
 **Body**: `multipart/form-data`, campo `photo` (archivo)
+
 - Formatos aceptados: `jpg`, `png`, `webp`
 - Tamaño máximo: `MAX_PHOTO_SIZE_MB` (default 2 MB)
 
 **Respuestas**
-| Status | Cuándo |
-|---|---|
-| 200 | Foto actualizada. Devuelve el usuario con el `photoUrl` nuevo |
-| 400 | Falta el archivo, formato no soportado, o excede el tamaño máximo |
-| 401 | Sin JWT |
+
+| Status | Cuándo                                                            |
+| ------ | ----------------------------------------------------------------- |
+| 200    | Foto actualizada. Devuelve el usuario con el `photoUrl` nuevo     |
+| 400    | Falta el archivo, formato no soportado, o excede el tamaño máximo |
+| 401    | Sin JWT                                                           |
 
 ```json
 // 200
-{ "id": "uuid", "email": "paciente@test.com", "role": "PATIENT", "createdAt": "2026-...", "photoUrl": "/uploads/photos/<archivo>.jpg", "name": "Juan Perez" }
+{
+  "id": "uuid",
+  "email": "paciente@test.com",
+  "role": "PATIENT",
+  "createdAt": "2026-...",
+  "photoUrl": "/uploads/photos/<archivo>.jpg",
+  "name": "Juan Perez"
+}
 ```
 
 ### `DELETE /api/auth/me/photo`
@@ -157,7 +192,17 @@ para setearla desde acá.
 
 ```json
 // 200
-[{ "id": "uuid", "userId": "uuid", "name": "Dra. Ana Fernandez", "specialty": "Cardiologia", "isActive": true, "createdAt": "2026-...", "photoUrl": null }]
+[
+  {
+    "id": "uuid",
+    "userId": "uuid",
+    "name": "Dra. Ana Fernandez",
+    "specialty": "Cardiologia",
+    "isActive": true,
+    "createdAt": "2026-...",
+    "photoUrl": null
+  }
+]
 ```
 
 ### `POST /api/doctors`
@@ -166,9 +211,16 @@ Crea un doctor **junto con su cuenta de usuario** (rol `DOCTOR`, para que pueda 
 Requiere JWT de rol **ADMIN**.
 
 **Body**
+
 ```json
-{ "name": "Dra. Ana Fernandez", "specialty": "Cardiologia", "email": "ana@clinica.com", "password": "secret123" }
+{
+  "name": "Dra. Ana Fernandez",
+  "specialty": "Cardiologia",
+  "email": "ana@clinica.com",
+  "password": "secret123"
+}
 ```
+
 - `email`: formato email, único (409 si ya existe)
 - `password`: mínimo 6 caracteres — el doctor la usa para loguearse en `POST /auth/login`
 
@@ -179,6 +231,7 @@ Requiere JWT de rol **ADMIN**.
 Edita `name` y/o `specialty` (no toca la cuenta/email). Requiere JWT de rol **ADMIN**.
 
 **Body** (al menos uno de los dos)
+
 ```json
 { "name": "Nuevo Nombre", "specialty": "Nueva Especialidad" }
 ```
@@ -212,6 +265,7 @@ los ya ocupados por reservas `CONFIRMED` o `CANCELLATION_REQUESTED` (un pedido d
 todavía no aprobado no libera el horario). Público.
 
 **Query params**
+
 - `doctorId` (requerido, UUID)
 - `date` (requerido, `YYYY-MM-DD`)
 
@@ -229,23 +283,31 @@ GET /api/appointments/availability?doctorId=<uuid>&date=2026-05-01
 Crea una reserva para el paciente autenticado. Requiere JWT de rol **PATIENT**.
 
 **Body**
+
 ```json
-{ "doctorId": "uuid", "startTime": "2026-05-01T14:00:00.000Z", "endTime": "2026-05-01T14:30:00.000Z" }
+{
+  "doctorId": "uuid",
+  "startTime": "2026-05-01T14:00:00.000Z",
+  "endTime": "2026-05-01T14:30:00.000Z"
+}
 ```
+
 - `endTime` debe ser posterior a `startTime` (validado por zod y por la BD)
 
 **Respuestas**
-| Status | Cuándo |
-|---|---|
-| 201 | Reserva creada |
-| 400 | Datos inválidos |
-| 401 | Sin JWT |
-| 403 | Rol distinto de PATIENT |
-| 409 | Horario ya reservado para ese doctor (superposición) |
+
+| Status | Cuándo                                               |
+| ------ | ---------------------------------------------------- |
+| 201    | Reserva creada                                       |
+| 400    | Datos inválidos                                      |
+| 401    | Sin JWT                                              |
+| 403    | Rol distinto de PATIENT                              |
+| 409    | Horario ya reservado para ese doctor (superposición) |
 
 ### `GET /api/appointments/mine`
 
 Lista las reservas propias. Requiere JWT de rol **PATIENT** o **DOCTOR**:
+
 - Si sos `PATIENT`, devuelve las citas donde sos el paciente.
 - Si sos `DOCTOR`, devuelve las citas donde sos el doctor (útil para obtener el `id` de una
   cita propia antes de llamar `POST /appointments/:id/request-cancellation`). Cada item incluye
@@ -255,7 +317,18 @@ Lista las reservas propias. Requiere JWT de rol **PATIENT** o **DOCTOR**:
 
 ```json
 // 200 (rol DOCTOR)
-[{ "id": "uuid", "doctorId": "uuid", "patientId": "uuid", "startTime": "2026-...", "endTime": "2026-...", "status": "CONFIRMED", "createdAt": "2026-...", "patientEmail": "paciente@test.com" }]
+[
+  {
+    "id": "uuid",
+    "doctorId": "uuid",
+    "patientId": "uuid",
+    "startTime": "2026-...",
+    "endTime": "2026-...",
+    "status": "CONFIRMED",
+    "createdAt": "2026-...",
+    "patientEmail": "paciente@test.com"
+  }
+]
 ```
 
 ### `GET /api/appointments`
@@ -277,12 +350,13 @@ Cancela una reserva. El `PATIENT` solo puede cancelar la propia; el `ADMIN` pued
 cualquiera.
 
 **Respuestas**
-| Status | Cuándo |
-|---|---|
-| 200 | Cancelada (status pasa a `CANCELLED`) |
-| 401 | Sin JWT |
-| 403 | PATIENT intentando cancelar la reserva de otro |
-| 404 | La reserva no existe |
+
+| Status | Cuándo                                         |
+| ------ | ---------------------------------------------- |
+| 200    | Cancelada (status pasa a `CANCELLED`)          |
+| 401    | Sin JWT                                        |
+| 403    | PATIENT intentando cancelar la reserva de otro |
+| 404    | La reserva no existe                           |
 
 ### `POST /api/appointments/:id/request-cancellation`
 
@@ -291,18 +365,20 @@ pendiente de aprobación de `ADMIN`. La cita pasa a `CANCELLATION_REQUESTED` (el
 bloqueado, no se libera hasta que se apruebe). Requiere JWT de rol **DOCTOR**.
 
 **Body**
+
 ```json
 { "reason": "Emergencia medica" }
 ```
 
 **Respuestas**
-| Status | Cuándo |
-|---|---|
-| 201 | Pedido creado, `status: "pending"` |
-| 400 | La cita no está `CONFIRMED` (ya cancelada, o ya tiene un pedido pendiente) |
-| 403 | La cita pertenece a otro doctor |
-| 404 | La cita no existe |
-| 409 | Ya existe un pedido pendiente para esta cita (carrera concurrente) |
+
+| Status | Cuándo                                                                     |
+| ------ | -------------------------------------------------------------------------- |
+| 201    | Pedido creado, `status: "pending"`                                         |
+| 400    | La cita no está `CONFIRMED` (ya cancelada, o ya tiene un pedido pendiente) |
+| 403    | La cita pertenece a otro doctor                                            |
+| 404    | La cita no existe                                                          |
+| 409    | Ya existe un pedido pendiente para esta cita (carrera concurrente)         |
 
 ---
 
@@ -315,7 +391,18 @@ Lista los pedidos de cancelación **pendientes** (de todos los doctores). Requie
 
 ```json
 // 200
-[{ "id": "uuid", "appointmentId": "uuid", "requestedBy": "uuid (userId del doctor)", "reason": "Emergencia medica", "status": "pending", "resolvedBy": null, "resolvedAt": null, "createdAt": "2026-..." }]
+[
+  {
+    "id": "uuid",
+    "appointmentId": "uuid",
+    "requestedBy": "uuid (userId del doctor)",
+    "reason": "Emergencia medica",
+    "status": "pending",
+    "resolvedBy": null,
+    "resolvedAt": null,
+    "createdAt": "2026-..."
+  }
+]
 ```
 
 ### `POST /api/cancellation-requests/:id/approve`
@@ -348,20 +435,23 @@ Registra un turno en la cola de hoy. Requiere JWT de rol **PATIENT**, **ADMIN**,
 (dueño)**.
 
 **Body**
+
 ```json
 { "appointmentId": "uuid (opcional)", "patientName": "Juan Perez", "priority": "normal" }
 ```
+
 - `patientName`: requerido siempre
 - `appointmentId`: opcional — si se pasa, debe existir, pertenecer a ese doctor y estar `CONFIRMED`
 - `priority`: `"normal"` (default) o `"preferente"`
 
 **Respuestas**
-| Status | Cuándo |
-|---|---|
-| 201 | Turno creado, con `number` correlativo del día |
-| 400 | La cita referenciada no pertenece a ese doctor, o no está `CONFIRMED` |
-| 404 | `appointmentId` no existe |
-| 409 | Esa cita **ya tiene** un turno de cola generado (doble check-in) |
+
+| Status | Cuándo                                                                |
+| ------ | --------------------------------------------------------------------- |
+| 201    | Turno creado, con `number` correlativo del día                        |
+| 400    | La cita referenciada no pertenece a ese doctor, o no está `CONFIRMED` |
+| 404    | `appointmentId` no existe                                             |
+| 409    | Esa cita **ya tiene** un turno de cola generado (doble check-in)      |
 
 ### `GET /api/queues/:doctorId`
 
@@ -439,14 +529,16 @@ Solo para **recibir** actualizaciones en tiempo real — todas las mutaciones va
 Escala horizontalmente entre múltiples instancias vía Redis Pub/Sub.
 
 **Cliente → Servidor**
-| type | payload | Efecto |
-|---|---|---|
-| `join-doctor-room` | `{ doctorId }` | Suscribe la conexión a las actualizaciones de ese doctor |
-| `leave-doctor-room` | `{ doctorId }` | Cancela la suscripción |
+
+| type                | payload        | Efecto                                                   |
+| ------------------- | -------------- | -------------------------------------------------------- |
+| `join-doctor-room`  | `{ doctorId }` | Suscribe la conexión a las actualizaciones de ese doctor |
+| `leave-doctor-room` | `{ doctorId }` | Cancela la suscripción                                   |
 
 **Servidor → Cliente**
-| type | payload | Se emite tras |
-|---|---|---|
-| `room-updated` | `{ doctorId, availability: Slot[] }` | Crear o cancelar una reserva de ese doctor |
-| `queue-updated` | `{ doctorId, date, currentTurn, waiting }` | check-in, `next`, `skip` o `call` |
-| `error` | `{ message }` | Mensaje mal formado o `doctorId` inexistente |
+
+| type            | payload                                    | Se emite tras                                |
+| --------------- | ------------------------------------------ | -------------------------------------------- |
+| `room-updated`  | `{ doctorId, availability: Slot[] }`       | Crear o cancelar una reserva de ese doctor   |
+| `queue-updated` | `{ doctorId, date, currentTurn, waiting }` | check-in, `next`, `skip` o `call`            |
+| `error`         | `{ message }`                              | Mensaje mal formado o `doctorId` inexistente |

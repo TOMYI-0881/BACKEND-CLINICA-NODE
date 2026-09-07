@@ -14,6 +14,7 @@ export interface TurnProps {
   status: TurnStatus;
   createdAt: Date;
   finishedAt: Date | null;
+  photoUrl: string | null;
 }
 
 /**
@@ -71,6 +72,10 @@ export class Turn {
 
   get finishedAt(): Date | null {
     return this.props.finishedAt;
+  }
+
+  get photoUrl(): string | null {
+    return this.props.photoUrl;
   }
 
   markInProgress(): Turn {
